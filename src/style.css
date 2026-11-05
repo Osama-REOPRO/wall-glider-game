@@ -4,6 +4,7 @@
   --accent: #5ff3ff;
   --hot: #ff7a3c;
   --muted: rgba(232, 246, 255, 0.55);
+  color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
@@ -35,7 +36,9 @@ html, body {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  padding: calc(env(safe-area-inset-top) + 14px) 16px 0;
+  padding-top: calc(env(safe-area-inset-top, 0px) + 14px);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
   text-align: center;
 }
 
@@ -62,7 +65,7 @@ html, body {
   pointer-events: auto;
   position: absolute;
   top: calc(env(safe-area-inset-top) + 14px);
-  right: 16px;
+  right: max(16px, env(safe-area-inset-right, 0px));
   min-width: 44px;
   height: 32px;
   padding: 0 10px;
