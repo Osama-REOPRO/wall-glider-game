@@ -1,0 +1,98 @@
+import type { Quality } from './renderer';
+
+const BEST_KEY = 'wall-glider.best';
+const QUALITY_KEY = 'wall-glider.quality';
+
+function readStorage(key: string): string | null {
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeStorage(key: string, value: string): void {
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    /* storage unavailable (private mode etc.): the value just isn't remembered */
+  }
+}
+
+/** DOM overlay: score, best score, title/game-over card, quality toggle. */
+export class Hud {
+  private scoreEl = document.getElementById('score')!;
+  private bestEl = document.getElementById('best')!;
+  private overlay = document.getElementById('overlay')!;
+  private title = this.overlay.querySelector('h1')!;
+  private sub = document.getElementById('overlay-sub')!;
+  private cta = document.getElementById('overlay-cta')!;
+  private qualityBtn = document.getElementById('quality') as HTMLButtonElement;
+  best = Number(readStorage(BEST_KEY) ?? 0) || 0;
+
+  onQualityChange: ((q: Quality) => void) | null = null;
+
+  constructor() {
+    this.qualityBtn.addEventListener('pointerdown', (e) => e.stopPropagation());
+    this.qualityBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const q: Quality = this.qualityBtn.textContent === 'HI' ? 'low' : 'high';
+      this.setQualityLabel(q);
+      writeStorage(QUALITY_KEY, q);
+      this.onQualityChange?.(q);
+    });
+    this.renderBest();
+  }
+
+  savedQuality(): Quality {
+    return readStorage(QUALITY_KEY) === 'low' ? 'low' : 'high';
+  }
+
+  setQualityLabel(q: Quality): void {
+    this.qualityBtn.textContent = q === 'high' ? 'HI' : 'LO';
+  }
+
+  setScore(n: number, bump = false): void {
+    this.scoreEl.textContent = String(n);
+    if (bump) {
+      this.scoreEl.classList.remove('bump');
+      void this.scoreEl.offsetWidth;
+      this.scoreEl.classList.add('bump');
+      setTimeout(() => this.scoreEl.classList.remove('bump'), 120);
+    }
+  }
+
+  showScore(visible: boolean): void {
+    this.scoreEl.style.visibility = visible ? 'visible' : 'hidden';
+  }
+
+  showTitle(): void {
+    this.title.textContent = 'WALL GLIDER';
+    this.sub.textContent = 'Drag to steer. Fly through the gaps.';
+    this.cta.textContent = 'Tap to start';
+    this.overlay.classList.add('visible');
+    this.showScore(false);
+  }
+
+  showGameOver(score: number): void {
+    const isBest = score > this.best;
+    if (isBest) {
+      this.best = score;
+      writeStorage(BEST_KEY, String(score));
+      this.renderBest();
+    }
+    this.title.textContent = isBest && score > 0 ? 'NEW BEST' : 'CRASHED';
+    this.sub.textContent = `Score ${score}  ·  Best ${this.best}`;
+    this.cta.textContent = 'Tap to retry';
+    this.overlay.classList.add('visible');
+  }
+
+  hideOverlay(): void {
+    this.overlay.classList.remove('visible');
+    this.showScore(true);
+  }
+
+  private renderBest(): void {
+    this.bestEl.textContent = this.best > 0 ? `Best ${this.best}` : '';
+  }
+}

@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#05060d" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <title>Wall Glider</title>
+  </head>
+  <body>
+    <canvas id="game"></canvas>
+    <div id="hud">
+      <div id="score">0</div>
+      <div id="best"></div>
+      <button id="quality" type="button" aria-label="Toggle graphics quality">HI</button>
+    </div>
+    <div id="overlay" class="visible">
+      <h1>WALL GLIDER</h1>
+      <p id="overlay-sub">Drag to steer. Fly through the gaps.</p>
+      <p id="overlay-cta" class="pulse">Tap to start</p>
+    </div>
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>
