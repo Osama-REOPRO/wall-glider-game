@@ -13,14 +13,14 @@ export class Tube {
   private period: number;
 
   constructor() {
-    const { radius, length, radialSegments, panelLength } = CONFIG.tube;
+    const { radius, length, radialSegments, panelLength, panelsAround } = CONFIG.tube;
     const geo = new THREE.CylinderGeometry(radius, radius, length, radialSegments, 1, true);
     geo.rotateX(Math.PI / 2); // axis along Z
 
     const maps = createTubeMaps();
-    // The texture holds 2×2 panels. 12 panels around the circumference.
+    // The texture holds 2×2 panels.
     this.period = panelLength * 2;
-    const repeatU = 6;
+    const repeatU = panelsAround / 2;
     const repeatV = length / this.period;
     for (const t of Object.values(maps)) t.repeat.set(repeatU, repeatV);
 
@@ -33,7 +33,7 @@ export class Tube {
       metalness: 0.55,
       emissiveMap: maps.emissiveMap,
       emissive: new THREE.Color(0x3fd8ff),
-      emissiveIntensity: 1.25,
+      emissiveIntensity: 1.1,
       side: THREE.BackSide,
     });
     this.mesh = new THREE.Mesh(geo, this.material);
@@ -43,7 +43,7 @@ export class Tube {
   /** Keep the tube around the ship: about 20 units behind it, the rest ahead. */
   update(shipZ: number): void {
     const snapped = Math.round(shipZ / this.period) * this.period;
-    this.mesh.position.z = snapped - (CONFIG.tube.length / 2 - 24);
+    this.mesh.position.z = snapped - (CONFIG.tube.length / 2 - 40);
   }
 
   setAccent(color: THREE.Color): void {

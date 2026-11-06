@@ -197,13 +197,13 @@ export class Dust {
   private count: number;
   private material: THREE.ShaderMaterial;
 
-  constructor(count = 260) {
+  constructor(count: number = CONFIG.particles.dustCount) {
     this.count = count;
     this.pos = new Float32Array(count * 3);
-    const size = new Float32Array(count).map(() => 0.05 + Math.random() * 0.08);
+    const size = new Float32Array(count).map(() => 0.07 + Math.random() * 0.12);
     const alpha = new Float32Array(count).fill(0.5);
     const col = new Float32Array(count * 3).fill(1.4);
-    for (let i = 0; i < count; i++) this.place(i, -Math.random() * 180);
+    for (let i = 0; i < count; i++) this.place(i, -Math.random() * CONFIG.particles.dustDepth);
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(this.pos, 3).setUsage(THREE.DynamicDrawUsage));
     geo.setAttribute('aSize', new THREE.BufferAttribute(size, 1));
@@ -227,7 +227,7 @@ export class Dust {
 
   private place(i: number, z: number): void {
     const a = Math.random() * Math.PI * 2;
-    const r = Math.sqrt(Math.random()) * (CONFIG.tube.radius - 0.4);
+    const r = Math.sqrt(Math.random()) * (CONFIG.tube.radius - 0.6);
     this.pos[i * 3] = Math.cos(a) * r;
     this.pos[i * 3 + 1] = Math.sin(a) * r;
     this.pos[i * 3 + 2] = z;
@@ -237,8 +237,9 @@ export class Dust {
     let dirty = false;
     for (let i = 0; i < this.count; i++) {
       const z = this.pos[i * 3 + 2];
-      if (z > shipZ + 8 || z < shipZ - 200) {
-        this.place(i, shipZ - 150 - Math.random() * 40);
+      const depth = CONFIG.particles.dustDepth;
+      if (z > shipZ + 8 || z < shipZ - depth - 20) {
+        this.place(i, shipZ - depth * 0.8 - Math.random() * depth * 0.2);
         dirty = true;
       }
     }
@@ -246,7 +247,7 @@ export class Dust {
   }
 
   reset(shipZ: number): void {
-    for (let i = 0; i < this.count; i++) this.place(i, shipZ - Math.random() * 180);
+    for (let i = 0; i < this.count; i++) this.place(i, shipZ - Math.random() * CONFIG.particles.dustDepth);
     (this.points.geometry.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
   }
 }

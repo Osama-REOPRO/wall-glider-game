@@ -27,7 +27,7 @@ export class Obstacle {
       metalness: 0.1,
       roughness: 0.4,
       emissive: 0xffffff,
-      emissiveIntensity: 3,
+      emissiveIntensity: 2.2,
     });
     this.mesh = new THREE.Mesh(new THREE.BufferGeometry(), [capMaterial, this.rimMaterial]);
   }
@@ -93,7 +93,7 @@ export class Obstacle {
     this.mesh.position.z = this.z;
     if (this.flash > 0) this.flash = Math.max(0, this.flash - dt * 2.5);
     this.rimMaterial.emissive.copy(this.baseColor).lerp(WHITE, this.flash);
-    this.rimMaterial.emissiveIntensity = 3 + this.flash * 6;
+    this.rimMaterial.emissiveIntensity = 2.2 + this.flash * 4;
   }
 
   /** Transform a world (x, y) into this obstacle's local frame. */
@@ -176,7 +176,7 @@ export class Obstacles {
       this.items.push(o);
       this.group.add(o.mesh);
     }
-    this.gapLight = new THREE.PointLight(0xff5a2a, 40, 30, 1.5);
+    this.gapLight = new THREE.PointLight(0xff5a2a, 110, 80, 1.4);
     this.group.add(this.gapLight);
   }
 
@@ -210,14 +210,14 @@ export class Obstacles {
       let cy = 0;
       let r = holeR;
       if (kind === 'circle') {
-        const maxOff = Math.max(0, R - r - 0.5);
+        const maxOff = Math.max(0, R - r - 1);
         const off = n === 0 ? 0 : Math.sqrt(Math.random()) * maxOff;
         cx = Math.cos(angle) * off;
         cy = Math.sin(angle) * off;
         o.build('circle', cx, cy, r, 0, 0);
       } else {
         r = holeR * 0.85; // slot half-height; slots are long, so a bit tighter
-        const maxOff = Math.max(0, R - r - 0.6);
+        const maxOff = Math.max(0, R - r - 1.2);
         cy = (Math.random() * 2 - 1) * maxOff;
         o.build('slot', 0, cy, r, angle, spin);
       }
@@ -232,13 +232,13 @@ export class Obstacles {
   update(dt: number, shipZ: number): void {
     let next: Obstacle | null = null;
     for (const o of this.items) {
-      if (o.z > shipZ + 12) this.respawn(o);
+      if (o.z > shipZ + 20) this.respawn(o);
       o.update(dt);
       if (o.z < shipZ && (next === null || o.z > next.z)) next = o;
     }
     if (next) {
       next.gapCenter(tmpGap);
-      this.gapLight.position.set(tmpGap.x, tmpGap.y, next.z + 1.2);
+      this.gapLight.position.set(tmpGap.x, tmpGap.y, next.z + 2.5);
       this.gapLight.color.copy(next.baseColor);
     }
   }

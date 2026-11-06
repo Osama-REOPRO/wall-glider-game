@@ -42,7 +42,7 @@ export class Ship {
       color: 0x8d9aab,
       metalness: 0.85,
       roughness: 0.32,
-      emissive: 0x0b2a3a,
+      emissive: 0x1c4258,
     });
     const hull = new THREE.Mesh(hullGeo, this.hullMat);
 
@@ -69,11 +69,11 @@ export class Ship {
     // Glowing edge outline (bloom turns this into a neon rim).
     const edges = new THREE.LineSegments(
       new THREE.EdgesGeometry(hullGeo, 30),
-      new THREE.LineBasicMaterial({ color: new THREE.Color(0x5ff3ff).multiplyScalar(1.6) }),
+      new THREE.LineBasicMaterial({ color: new THREE.Color(0x5ff3ff).multiplyScalar(2.4) }),
     );
 
     // Engine nozzles at the rear notch.
-    const nozzleMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(1.0, 0.75, 0.45).multiplyScalar(2.5) });
+    const nozzleMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(1.0, 0.75, 0.45).multiplyScalar(1.5) });
     for (const x of [-0.22, 0.22]) {
       const nozzle = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.08, 0.06), nozzleMat);
       nozzle.position.set(x, 0, 0.42);
@@ -83,7 +83,7 @@ export class Ship {
     this.engineGlow = new THREE.Sprite(
       new THREE.SpriteMaterial({
         map: createGlowTexture(),
-        color: new THREE.Color(1.0, 0.6, 0.3).multiplyScalar(1.3),
+        color: new THREE.Color(1.0, 0.6, 0.3).multiplyScalar(0.7),
         blending: THREE.AdditiveBlending,
         depthWrite: false,
         transparent: true,
@@ -93,11 +93,12 @@ export class Ship {
     this.engineGlow.position.set(0, 0, 0.55);
 
     this.body.add(hull, ridge, edges, this.engineGlow);
+    this.body.scale.setScalar(CONFIG.ship.scale);
     this.group.add(this.body);
 
     // Light carried by the ship: it lights the tube walls as the ship flies past them.
-    this.light = new THREE.PointLight(0x9feaff, 22, 22, 1.6);
-    this.light.position.set(0, 0.4, -2.2);
+    this.light = new THREE.PointLight(0x9feaff, 160, 60, 1.5);
+    this.light.position.set(0, 0.3, -9);
     this.group.add(this.light);
   }
 
@@ -131,12 +132,12 @@ export class Ship {
 
     // Engine flicker.
     const f = 1 + Math.sin(this.time * 60) * 0.08 + Math.sin(this.time * 23) * 0.06;
-    this.engineGlow.scale.setScalar(0.75 * f);
+    this.engineGlow.scale.setScalar(0.55 * f);
   }
 
   /** World-space point just behind the engines, where the exhaust trail is emitted. */
   tailPosition(out: THREE.Vector3): THREE.Vector3 {
-    return out.copy(this.direction).multiplyScalar(-0.55).add(this.position);
+    return out.copy(this.direction).multiplyScalar(-CONFIG.ship.tailOffset).add(this.position);
   }
 
   /** Wing-tip positions for the thin contrails. */

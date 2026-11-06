@@ -19,9 +19,9 @@ const canvas = document.getElementById('game') as HTMLCanvasElement;
 const scene = new THREE.Scene();
 const fogColor = new THREE.Color(0x05060d);
 scene.background = fogColor;
-scene.fog = new THREE.FogExp2(fogColor, 0.0115);
+scene.fog = new THREE.FogExp2(fogColor, 0.0048);
 
-const camera = new THREE.PerspectiveCamera(CONFIG.camera.fov, window.innerWidth / window.innerHeight, 0.1, 400);
+const camera = new THREE.PerspectiveCamera(CONFIG.camera.fov, window.innerWidth / window.innerHeight, 0.05, 900);
 const renderer = new Renderer(canvas, scene, camera);
 
 // A faint image-based environment gives the metal surfaces some reflections.
@@ -36,7 +36,7 @@ const obstacles = new Obstacles();
 const particles = new Particles();
 const dust = new Dust();
 // Short-lived light for explosions.
-const blastLight = new THREE.PointLight(0xff9a40, 0, 40, 1.4);
+const blastLight = new THREE.PointLight(0xff9a40, 0, 80, 1.3);
 scene.add(tube.mesh, ship.group, obstacles.group, particles.points, dust.points, blastLight);
 
 const input = new SteerInput(canvas);
@@ -74,7 +74,7 @@ const tmpD = new THREE.Vector3();
 const tmpGap = new THREE.Vector2();
 
 const COLORS = {
-  trailHot: new THREE.Color(0.7, 1.2, 1.9),
+  trailHot: new THREE.Color(0.45, 0.85, 1.5),
   trailCool: new THREE.Color(0.35, 0.08, 0.9),
   contrail: new THREE.Color(0.5, 0.8, 1.2),
   fire: new THREE.Color(4.0, 2.6, 1.0),
@@ -119,9 +119,9 @@ function crash(point: THREE.Vector3): void {
   shake = 1;
   timeScale = 0.35;
   blastLight.position.copy(point).addScaledVector(ship.direction, -1.5);
-  blastLight.intensity = 400;
+  blastLight.intensity = 900;
   tmpA.copy(ship.direction).multiplyScalar(ship.speed * 0.15);
-  particles.burst(point, 320, 18, { life: 1.4, size: 0.5, endSize: 0.05, color: COLORS.fire, endColor: COLORS.ember, drag: 2.2 }, tmpA);
+  particles.burst(point, 320, 22, { life: 1.4, size: 0.5, endSize: 0.05, color: COLORS.fire, endColor: COLORS.ember, drag: 2.2 }, tmpA);
   particles.burst(point, 120, 30, { life: 0.6, size: 0.18, endSize: 0, color: COLORS.spark, endColor: COLORS.fire, drag: 1.2 });
   try {
     navigator.vibrate?.(120);
@@ -143,17 +143,17 @@ function emitTrail(dt: number): void {
   if (n <= 0) return;
   // Spawn along the path travelled this frame so the trail has no gaps at high speed.
   const tailNow = ship.tailPosition(tmpA);
-  const tailPrev = tmpB.copy(ship.prevPosition).addScaledVector(ship.direction, -0.55);
-  const back = tmpC.copy(ship.direction).multiplyScalar(-7);
+  const tailPrev = tmpB.copy(ship.prevPosition).addScaledVector(ship.direction, -CONFIG.ship.tailOffset);
+  const back = tmpC.copy(ship.direction).multiplyScalar(-5);
   for (let i = 0; i < n; i++) {
     const f = (i + Math.random()) / n;
     particles.emit(
-      tailPrev.x + (tailNow.x - tailPrev.x) * f + (Math.random() - 0.5) * 0.12,
-      tailPrev.y + (tailNow.y - tailPrev.y) * f + (Math.random() - 0.5) * 0.12,
+      tailPrev.x + (tailNow.x - tailPrev.x) * f + (Math.random() - 0.5) * 0.07,
+      tailPrev.y + (tailNow.y - tailPrev.y) * f + (Math.random() - 0.5) * 0.07,
       tailPrev.z + (tailNow.z - tailPrev.z) * f,
-      back.x + (Math.random() - 0.5) * 1.5,
-      back.y + (Math.random() - 0.5) * 1.5,
-      back.z + (Math.random() - 0.5) * 1.5,
+      back.x + (Math.random() - 0.5) * 0.9,
+      back.y + (Math.random() - 0.5) * 0.9,
+      back.z + (Math.random() - 0.5) * 0.9,
       TRAIL,
     );
   }
@@ -163,17 +163,17 @@ function emitTrail(dt: number): void {
     particles.emit(p.x, p.y, p.z, 0, 0, 0, CONTRAIL);
   }
 }
-const TRAIL = { life: 0.45, size: 0.16, endSize: 0.42, color: COLORS.trailHot, endColor: COLORS.trailCool, drag: 1.5 };
-const CONTRAIL = { life: 0.35, size: 0.09, endSize: 0.02, color: COLORS.contrail, endColor: COLORS.trailCool };
+const TRAIL = { life: 0.5, size: 0.1, endSize: 0.26, color: COLORS.trailHot, endColor: COLORS.trailCool, drag: 1.5 };
+const CONTRAIL = { life: 0.4, size: 0.055, endSize: 0.012, color: COLORS.contrail, endColor: COLORS.trailCool };
 
 function passBurst(o: (typeof obstacles.items)[number]): void {
   o.flash = 1;
   const color = o.baseColor.clone().multiplyScalar(3);
-  for (let i = 0; i < 70; i++) {
+  for (let i = 0; i < 120; i++) {
     o.randomRimPoint(tmpA);
-    particles.emit(tmpA.x, tmpA.y, tmpA.z, (Math.random() - 0.5) * 4, (Math.random() - 0.5) * 4, (Math.random() - 0.5) * 4, {
-      life: 0.7,
-      size: 0.22,
+    particles.emit(tmpA.x, tmpA.y, tmpA.z, (Math.random() - 0.5) * 6, (Math.random() - 0.5) * 6, (Math.random() - 0.5) * 6, {
+      life: 0.8,
+      size: 0.32,
       endSize: 0,
       color,
       drag: 1,
@@ -199,10 +199,14 @@ function updateCamera(dt: number, realDt: number): void {
   const p = ship.position;
   // Sit behind the ship, pulled toward the tube axis so the way ahead stays readable.
   tmpA.set(p.x * f, p.y * f + C.height, p.z + C.distance);
-  const R = CONFIG.tube.radius - 0.9;
+  const R = CONFIG.tube.radius - 1.2;
   const rad = Math.hypot(tmpA.x, tmpA.y);
   if (rad > R) tmpA.multiplyScalar(R / rad).setZ(p.z + C.distance);
-  tmpB.set(p.x * 0.85 + ship.direction.x * 6, p.y * 0.85 + ship.direction.y * 6, p.z - 16);
+  tmpB.set(
+    p.x * 0.92 + ship.direction.x * C.lookAhead * 0.35,
+    p.y * 0.92 + ship.direction.y * C.lookAhead * 0.35,
+    p.z - C.lookAhead,
+  );
 
   const k = state === 'dead' ? 1 - Math.exp(-2 * dt) : 1 - Math.exp(-9 * dt);
   camPos.lerp(tmpA, k);
