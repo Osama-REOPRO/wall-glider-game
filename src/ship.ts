@@ -8,6 +8,10 @@ export class Ship {
   /** Inner group that carries the visual banking so the light and exhaust stay level. */
   private body = new THREE.Group();
   readonly light: THREE.PointLight;
+  /** Full intensity of the ship light; `dimForWall()` scales it down close to a wall. */
+  readonly lightIntensity = 160;
+  /** How far ahead of the ship the light sits. */
+  readonly lightAhead = 9;
   private engineGlow: THREE.Sprite;
   private hullMat: THREE.MeshStandardMaterial;
 
@@ -99,9 +103,24 @@ export class Ship {
     this.group.add(this.body);
 
     // Light carried by the ship: it lights the tube walls as the ship flies past them.
-    this.light = new THREE.PointLight(0x9feaff, 160, 60, 1.5);
-    this.light.position.set(0, 0.3, -9);
+    this.light = new THREE.PointLight(0x9feaff, this.lightIntensity, 60, 1.5);
+    this.light.position.set(0, 0.3, -this.lightAhead);
     this.group.add(this.light);
+  }
+
+  /**
+   * Keep the lit pool on an approaching wall at a steady brightness instead of letting it flare to
+   * white (which, with bloom, would wash out the ship's shadow right where the player is looking).
+   * `wallDist` is the distance from the ship to the wall along the tunnel, or null for none.
+   */
+  dimForWall(wallDist: number | null): void {
+    const SAFE = 12; // light-to-wall distance at which the pool is as bright as it should get
+    if (wallDist === null) {
+      this.light.intensity = this.lightIntensity;
+      return;
+    }
+    const lightToWall = Math.max(1, wallDist - this.lightAhead * -this.direction.z);
+    this.light.intensity = this.lightIntensity * Math.min(1, Math.pow(lightToWall / SAFE, 1.5));
   }
 
   /** Current visual bank angle (radians). */

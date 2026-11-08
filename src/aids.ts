@@ -5,12 +5,18 @@ import type { Obstacle, Obstacles } from './obstacles';
 
 /** Which flight aids are switched on (each is toggled separately in the Aids panel). */
 export interface AidSettings {
+  /** In world: the ship's shadow on the next wall. */
   shadow: boolean;
+  /** In world: the gap rim pulses red on a hit course. */
   rim: boolean;
+  /** Interface: brackets, outline and hitbox ring at the crossing point. */
+  markers: boolean;
+  /** Rules: smaller collision radius. */
   forgiving: boolean;
 }
 
-export const DEFAULT_AIDS: AidSettings = { shadow: true, rim: true, forgiving: true };
+// Interface markers are off by default: cues should live in the world (see docs/DESIGN.md, "Guiding principles").
+export const DEFAULT_AIDS: AidSettings = { shadow: true, rim: true, markers: false, forgiving: true };
 
 export interface Prediction {
   obstacle: Obstacle;
@@ -122,35 +128,139 @@ function bracketGeometry(): THREE.BufferGeometry {
   return g;
 }
 
+const shadowVertex = /* glsl */ `
+  varying vec2 vUv;
+  varying vec2 vWorld;
+  void main() {
+    vUv = uv;
+    vec4 w = modelMatrix * vec4(position, 1.0);
+    vWorld = w.xy;
+    gl_Position = projectionMatrix * viewMatrix * w;
+  }
+`;
+
+// Darkens the wall except inside the gap: the gap test mirrors Obstacle.fits().
+const shadowFragment = /* glsl */ `
+  uniform sampler2D uMap;
+  uniform float uUseMap;
+  uniform float uOpacity;
+  uniform float uKind;   // 0 = circular hole, 1 = slot
+  uniform vec3 uHole;    // circle: centre x, y and radius; slot: (unused, offset, half-height)
+  uniform float uAngle;  // the wall's current rotation
+  varying vec2 vUv;
+  varying vec2 vWorld;
+  void main() {
+    float c = cos(-uAngle), s = sin(-uAngle);
+    vec2 p = vec2(vWorld.x * c - vWorld.y * s, vWorld.x * s + vWorld.y * c);
+    bool inGap = uKind < 0.5 ? length(p - uHole.xy) < uHole.z : abs(p.y - uHole.y) < uHole.z;
+    if (inGap) discard;
+    float a = uUseMap > 0.5 ? texture2D(uMap, vUv).a : 1.0;
+    gl_FragColor = vec4(0.0, 0.0, 0.0, a * uOpacity);
+  }
+`;
+
 /**
- * The projected "shadow": the ship's rear silhouette drawn where it will cross the next wall,
- * cast along the flight path rather than by a light, so it is right at any heading.
- * On course to hit: a dark shadow with a red outline on the wall's face.
- * On course to pass: a cyan outline floating in the gap.
- * A ring marks the actual collision footprint (the hitbox) at the centre.
- * Corner brackets keep the spot readable from far away; they close in on the silhouette as the wall nears.
+ * In-world aid: the ship's shadow on the next wall, cast along the flight path (not by a light), so it
+ * is right at any heading. It is plain dark, with no UI colour, and it is clipped by the gap like a
+ * real shadow: fully on the wall on a hit course, gone on a clean pass, and partly cut off when the
+ * ship is about to clip the rim.
+ * A soft blob around the true-size silhouette acts as a penumbra: it grows softer and lighter with
+ * distance, as a real soft shadow does, which keeps the spot findable from far away.
  */
-export class ProjectedShadow {
+export class WallShadow {
   readonly group = new THREE.Group();
-  private fillMat: THREE.MeshBasicMaterial;
+  private blob: THREE.Mesh;
+  private blobUniforms: Record<string, THREE.IUniform>;
+  private fillUniforms: Record<string, THREE.IUniform>;
+  private hole = {
+    uKind: { value: 0 },
+    uHole: { value: new THREE.Vector3() },
+    uAngle: { value: 0 },
+  };
+
+  constructor() {
+    const make = (map: THREE.Texture | null) => {
+      const uniforms: Record<string, THREE.IUniform> = {
+        ...this.hole, // shared: one update clips both meshes
+        uMap: { value: map },
+        uUseMap: { value: map ? 1 : 0 },
+        uOpacity: { value: 0 },
+      };
+      const mat = new THREE.ShaderMaterial({
+        uniforms,
+        vertexShader: shadowVertex,
+        fragmentShader: shadowFragment,
+        transparent: true,
+        depthWrite: false,
+      });
+      return { mat, uniforms };
+    };
+    const blob = make(blobTexture());
+    this.blobUniforms = blob.uniforms;
+    this.blob = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), blob.mat);
+    const fill = make(null);
+    this.fillUniforms = fill.uniforms;
+    const silhouette = new THREE.Mesh(new THREE.ShapeGeometry(rearProfile()), fill.mat);
+    this.silhouette = silhouette;
+    // Draw after the (transparent) walls so the shadow lies on their face.
+    this.blob.renderOrder = 2;
+    silhouette.renderOrder = 2;
+    this.group.add(this.blob, silhouette);
+    this.group.visible = false;
+  }
+
+  private silhouette: THREE.Mesh;
+
+  hide(): void {
+    this.group.visible = false;
+  }
+
+  show(p: Prediction, bank: number, speed: number): void {
+    if (p.outcome === 'tube' || p.strength <= 0) {
+      this.hide();
+      return;
+    }
+    const o = p.obstacle;
+    this.group.visible = true;
+    this.group.position.set(p.point.x, p.point.y, p.point.z + 0.05);
+    this.silhouette.rotation.z = bank;
+    // Clip against the gap as it looks now (the bevel makes the visible hole slightly smaller).
+    this.hole.uKind.value = o.kind === 'circle' ? 0 : 1;
+    this.hole.uHole.value.set(o.cx, o.cy, o.r - BEVEL);
+    this.hole.uAngle.value = o.angle;
+    // Penumbra: about the wingspan up close, wider (and a little fainter) with distance. It has to stay
+    // dark enough to read against the high-contrast hazard stripes.
+    const dist = p.timeToImpact * speed;
+    const half = 0.62 * CONFIG.ship.scale + dist * 0.05;
+    this.blob.scale.setScalar(half);
+    this.blobUniforms.uOpacity.value = p.strength;
+    this.fillUniforms.uOpacity.value = p.strength;
+  }
+}
+
+/**
+ * Interface aid: markers showing where the ship will cross the next wall. Red on a hit course,
+ * cyan floating in the gap on a pass. They are not clipped by the gap.
+ * - The ship's true-size rear outline (banked like the ship) and a ring for the actual hitbox.
+ * - Corner brackets that stay about 5% of the distance across, so the spot is readable from far away;
+ *   they close in on the outline as the wall nears.
+ */
+export class TargetMarker {
+  readonly group = new THREE.Group();
   private lineMat: THREE.LineBasicMaterial;
   private coreMat: THREE.LineBasicMaterial;
   private core: THREE.LineLoop;
+  private outline: THREE.LineLoop;
   private brackets: THREE.Mesh;
   private bracketMat: THREE.MeshBasicMaterial;
-  /** Soft dark blob under the brackets on a hit course: the classic platformer drop shadow. */
-  private blob: THREE.Mesh;
-  private blobMat: THREE.MeshBasicMaterial;
   // Moderate HDR values: brighter ones get desaturated toward white by the tone mapper.
   private hitColor = new THREE.Color(1.8, 0.06, 0.04);
   private passColor = new THREE.Color(0.25, 1.5, 2.0);
 
   constructor() {
     const shape = rearProfile();
-    this.fillMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, depthWrite: false, fog: false });
-    const fill = new THREE.Mesh(new THREE.ShapeGeometry(shape), this.fillMat);
     this.lineMat = new THREE.LineBasicMaterial({ transparent: true, depthWrite: false, fog: false });
-    const outline = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(shape.getPoints()), this.lineMat);
+    this.outline = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(shape.getPoints()), this.lineMat);
     this.coreMat = new THREE.LineBasicMaterial({ transparent: true, depthWrite: false, fog: false });
     const circle: THREE.Vector3[] = [];
     for (let i = 0; i < 32; i++) {
@@ -160,12 +270,9 @@ export class ProjectedShadow {
     this.core = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(circle), this.coreMat);
     this.bracketMat = new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, fog: false, side: THREE.DoubleSide });
     this.brackets = new THREE.Mesh(bracketGeometry(), this.bracketMat);
-    this.blobMat = new THREE.MeshBasicMaterial({ map: blobTexture(), color: 0x000000, transparent: true, depthWrite: false, fog: false });
-    this.blob = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.blobMat);
-    // Draw after the (transparent) walls so the shadow sits on top of their face; blob first.
-    this.blob.renderOrder = 2;
-    for (const o of [fill, outline, this.core, this.brackets]) o.renderOrder = 3;
-    this.group.add(this.blob, fill, outline, this.core, this.brackets);
+    // Drawn after the walls and the in-world shadow.
+    for (const o of [this.outline, this.core, this.brackets]) o.renderOrder = 3;
+    this.group.add(this.outline, this.core, this.brackets);
     this.group.visible = false;
   }
 
@@ -173,33 +280,23 @@ export class ProjectedShadow {
     this.group.visible = false;
   }
 
-  show(p: Prediction, bank: number, radius: number): void {
+  show(p: Prediction, bank: number, radius: number, speed: number): void {
     if (p.outcome === 'tube' || p.strength <= 0) {
       this.hide();
       return;
     }
-    const hit = p.outcome === 'wall';
+    const color = p.outcome === 'wall' ? this.hitColor : this.passColor;
     this.group.visible = true;
-    // Just in front of the wall's face so it never z-fights with it.
-    this.group.position.set(p.point.x, p.point.y, p.point.z + 0.05);
-    this.group.rotation.z = bank;
+    this.group.position.set(p.point.x, p.point.y, p.point.z + 0.06);
+    this.outline.rotation.z = bank;
     this.core.scale.setScalar(radius);
-    this.fillMat.opacity = hit ? 0.75 * p.strength : 0.0;
-    this.lineMat.color.copy(hit ? this.hitColor : this.passColor);
+    this.lineMat.color.copy(color);
     this.lineMat.opacity = p.strength;
-    this.coreMat.color.copy(this.lineMat.color);
+    this.coreMat.color.copy(color);
     this.coreMat.opacity = p.strength * 0.9;
-    // Brackets: about 5% of the distance to the wall across, never tighter than the wingspan.
-    const dist = p.timeToImpact * this.speedHint;
-    const half = Math.max(0.62 * CONFIG.ship.scale * 1.4, dist * 0.05);
-    this.brackets.scale.setScalar(half);
-    this.blob.scale.setScalar(half * 1.35);
-    this.blobMat.opacity = hit ? 0.8 * p.strength : 0;
-    this.brackets.rotation.z = -bank; // keep brackets square to the screen, not banked
-    this.bracketMat.color.copy(this.lineMat.color);
+    const dist = p.timeToImpact * speed;
+    this.brackets.scale.setScalar(Math.max(0.62 * CONFIG.ship.scale * 1.4, dist * 0.05));
+    this.bracketMat.color.copy(color);
     this.bracketMat.opacity = p.strength;
   }
-
-  /** Current ship speed, used to turn time-to-impact back into distance for the bracket size. */
-  speedHint: number = CONFIG.ship.startSpeed;
 }

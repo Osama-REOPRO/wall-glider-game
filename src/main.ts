@@ -11,7 +11,7 @@ import { Particles, Dust } from './particles';
 import { checkCollision } from './collision';
 import { Hud } from './hud';
 import { Space } from './space';
-import { ProjectedShadow, predict, hitRadius, type Prediction } from './aids';
+import { WallShadow, TargetMarker, predict, hitRadius, type Prediction } from './aids';
 
 type State = 'title' | 'playing' | 'dead';
 /** 'tunnel' is the game. 'free' is open space with no obstacles, for testing the controls. */
@@ -43,8 +43,9 @@ const dust = new Dust();
 // Short-lived light for explosions.
 const blastLight = new THREE.PointLight(0xff9a40, 0, 80, 1.3);
 scene.add(tube.mesh, ship.group, obstacles.group, particles.points, dust.points, blastLight);
-const shadow = new ProjectedShadow();
-scene.add(shadow.group);
+const shadow = new WallShadow();
+const marker = new TargetMarker();
+scene.add(shadow.group, marker.group);
 const space = new Space();
 space.group.visible = false;
 scene.add(space.group);
@@ -72,6 +73,8 @@ let state: State = 'title';
 let mode: Mode = 'tunnel';
 let readoutTimer = 0;
 let prediction: Prediction | null = null;
+/** Debug: freezes the simulation while rendering continues (used by automated screenshots). */
+let paused = false;
 let score = 0;
 let deadTime = 0;
 let timeScale = 1;
@@ -245,17 +248,20 @@ function updateAids(yaw: number, pitch: number): void {
   for (const o of obstacles.items) o.warn = 0;
   if (!prediction) {
     shadow.hide();
+    marker.hide();
     return;
   }
   if (hud.aids.rim && prediction.outcome === 'wall') prediction.obstacle.warn = prediction.strength;
-  shadow.speedHint = ship.speed;
-  if (hud.aids.shadow) shadow.show(prediction, ship.bank, radius);
+  if (hud.aids.shadow) shadow.show(prediction, ship.bank, ship.speed);
   else shadow.hide();
+  if (hud.aids.markers) marker.show(prediction, ship.bank, radius, ship.speed);
+  else marker.hide();
 }
 
 function clearAids(): void {
   prediction = null;
   shadow.hide();
+  marker.hide();
   for (const o of obstacles.items) o.warn = 0;
 }
 
@@ -351,7 +357,7 @@ function frame(now: number): void {
     timeScale += (1 - timeScale) * (1 - Math.exp(-1.5 * realDt));
     if (deadTime > 0.9 && deadTime - realDt <= 0.9) hud.showGameOver(score);
   }
-  const dt = realDt * timeScale;
+  const dt = paused ? 0 : realDt * timeScale;
 
   if (mode === 'free') {
     ship.speed = CONFIG.space.speed;
@@ -381,6 +387,8 @@ function frame(now: number): void {
   if (state !== 'dead') emitTrail(dt);
 
   if (mode === 'tunnel') {
+    const next = obstacles.nextAhead(ship.position.z);
+    ship.dimForWall(next ? ship.position.z - (next.z + CONFIG.obstacles.thickness / 2) : null);
     obstacles.update(dt, ship.position.z);
     tube.update(ship.position.z);
     dust.update(ship.position.z);
@@ -388,7 +396,10 @@ function frame(now: number): void {
   particles.update(dt);
   if (blastLight.intensity > 0) blastLight.intensity = Math.max(0, blastLight.intensity * Math.exp(-3.5 * realDt) - 0.5);
   updateCamera(dt, realDt);
-  if (mode === 'free') space.update(dt, camera, ship.position);
+  if (mode === 'free') {
+    ship.dimForWall(null);
+    space.update(dt, camera, ship.position);
+  }
   renderer.setAberration(state === 'dead' ? shake * 0.08 : 0.004 + (ship.speed - CONFIG.ship.startSpeed) * 0.0006);
   renderer.render();
   requestAnimationFrame(frame);
@@ -427,11 +438,15 @@ requestAnimationFrame(frame);
   },
   aids: hud.aids,
   shadow,
+  marker,
   ship,
   input,
   obstacles,
   fps: () => frameTimes.length / frameTimes.reduce((a, b) => a + b, 0),
   start: startGame,
+  pause: (on: boolean) => {
+    paused = on;
+  },
   startFree: startFreeFlight,
   menu: toMenu,
 };

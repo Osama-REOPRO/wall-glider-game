@@ -35,6 +35,7 @@ html, body {
 #hud {
   position: fixed;
   inset: 0;
+  z-index: 2; /* above the menu overlay, so the Aids panel is never covered */
   pointer-events: none;
   padding-top: calc(env(safe-area-inset-top, 0px) + 14px);
   padding-left: max(16px, env(safe-area-inset-left, 0px));
@@ -76,14 +77,14 @@ html, body {
   right: max(16px, env(safe-area-inset-right, 0px));
   display: flex;
   flex-direction: column;
-  padding: 10px 14px 6px;
+  padding: 4px 14px 6px;
   border-radius: 14px;
   border: 1px solid rgba(95, 243, 255, 0.35);
   background: rgba(5, 6, 13, 0.82);
   text-align: left;
 }
 #aids-panel .panel-title {
-  margin: 0 0 4px;
+  margin: 8px 0 0;
   font-size: 11px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -145,6 +146,7 @@ html, body {
 #overlay {
   position: fixed;
   inset: 0;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   align-items: center;

@@ -4,7 +4,7 @@ A 3D mobile prototype. A triangular ship flies on its own down an endless tube, 
 
 **Free flight** (the menu button, or a link ending in `#free`) is an open-space sandbox for testing the controls. There's no tunnel and no obstacles, turning is unlimited (pitch stops short of straight up and down), and a readout shows heading, pitch and speed.
 
-**Flight aids** (the Aids button, top right) help you judge depth from behind the ship: a shadow showing where you'll cross the next wall, a rim that pulses red when you're about to hit, and a forgiving hitbox. Each can be switched on and off.
+**Flight aids** (the Aids button, top right) help you judge depth from behind the ship, and each can be switched on and off. In the world: the ship's shadow on the next wall (clipped by the gap, so a near-miss shows as a half shadow) and a rim that pulses red when you're about to hit. A forgiving hitbox is on by default. Interface target markers exist for comparison but are off by default, because cues should live in the world rather than in the UI.
 
 Design decisions and the reasoning behind them are in [`docs/DESIGN.md`](docs/DESIGN.md).
 

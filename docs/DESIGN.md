@@ -2,6 +2,20 @@
 
 This file records the design decisions made so far: what we chose, why, and what we turned down. Any change that makes a design decision updates this file in the same commit. Tunable numbers live in `src/config.ts`; this file explains the reasoning behind them.
 
+## Guiding principles
+
+### Keep cues in the world, not in the UI
+
+> "After I added those indicators to make it clearer where you are headed and compensate for limited depth info, when the indicators are too prominent the game stops being about steering a ship and starts being about 'moving a cursor inside a circle quickly'. I really don't like that, so let's reduce UI assistance as much as possible so you are immersed in the world rather than looking at UI. Let's keep all the cues in world, as much as possible."
+>
+> (the designer, after playtesting the target markers)
+
+This principle overrides convenience. When the player needs information, look first for a way the world itself can show it: a shadow, light, colour, motion or sound coming from the scene. Use an interface overlay only as a last resort, and keep it subtle and off by default. A cue that turns flying into aiming a cursor at a target has failed, however clear it is.
+
+What this means in practice:
+- Flight aids are grouped **In world** (shadow, rim warning), **Interface** (target markers) and **Rules** (forgiving hitbox). The Interface group is **off by default** and stays available only for comparison in playtests.
+- New readability problems get an in-world solution first.
+
 ## The game in one paragraph
 
 A small triangular ship flies forward on its own down an endless tunnel. The player controls only its heading: dragging a finger turns the nose, and the ship flies wherever the nose points. Walls cross the tunnel, each with a gap to fly through. Touching a wall or the tunnel ends the run. The target is a vertical slice: one loop, polished close to final visual quality, tested by opening a URL on a phone.
@@ -53,6 +67,7 @@ The user asked for a bigger world and a smaller ship ("like Stardew Valley"). We
 
 - **Bloom does most of the "good lighting" work.** It was tuned down (strength 0.6, threshold 0.85) after the first screenshots were washed out.
 - **Ship light:** a point light carried by the ship and placed about 9 units *ahead* of it. Close behind the hull, it blew the small ship out into a white blob. Ahead, it lights the walls you're about to reach.
+  - **It dims as a wall approaches** (`Ship.dimForWall`), so the lit pool on the wall keeps a steady brightness. At full strength a few units from the wall it flared to white, and bloom washed out the ship's shadow exactly where the player is looking. Now the shadow sits as a dark shape inside a softly lit pool, the classic spotlight-and-shadow contrast.
 - **Gap light:** a light in the next gap, coloured like its rim, so the walls ahead glow around the target.
 - **Blast light:** a short-lived light for explosions.
 - **Image-based environment:** a faint one (RoomEnvironment) so metal has some reflections.
@@ -87,23 +102,35 @@ The camera is about 6 units behind the ship, so a wall the ship has just passed 
 |---|---|
 | Real shadow from a light (Mario style) | A light's shadow only lines up with your path when you fly straight at the wall, so it's misleading when turning. Shadow maps are also costly on mobile. We used the idea but cast the shadow **along the flight path** instead. |
 | Reflection of the ship in the wall | Needs a second render of the scene. A mirror image shows distance but not where you'll pass relative to the gap. Rejected. |
-| Ship headlight (spotlight pool) | Natural looking, but a soft pool is hard to read precisely at speed, and it adds a light to every surface. Kept as a possible later addition for atmosphere. |
+| Ship headlight (spotlight pool) | A soft pool alone is hard to read precisely at speed. The ship light now does part of this job: it keeps a steady pool on the approaching wall, with the shadow inside it. |
 | Aim line from the nose | Exact and cheap, but feels gamey. Not built. |
-| **Projected shadow** | **Built.** |
+| **Projected shadow** | **Built**, then split into an in-world shadow and interface markers. |
 | **Rim warning** | **Built.** |
 | **Forgiving hitbox** | **Built.** |
 
-**What was built.** Each aid can be switched on and off in the **Aids** panel. All three are on by default, and the choice is saved per browser.
+**What was built.** Each aid can be switched on and off in the **Aids** panel, and the choice is saved per browser. The panel groups them by kind, because the designer wanted to compare world cues against interface cues (see Guiding principles).
 
-1. **Projected shadow:**
-   - The ship's rear silhouette, at true size, drawn where it will cross the next wall, plus a ring showing the actual hitbox.
-   - On course to **hit**: a dark blob shadow with red brackets, on the wall's surface.
-   - On course to **pass**: cyan brackets floating in the gap.
-   - The true-size silhouette is only a few pixels from far away, so **corner brackets** keep the spot readable. They stay about 5% of the distance across and close in on the silhouette as the wall nears. Brackets mark a place without exaggerating the ship's size.
-   - Bracket bars are thin meshes, because WebGL draws all lines 1 pixel wide.
-   - Cue colours are moderate HDR values; brighter ones were desaturated to pink by the tone mapper.
-2. **Rim warning:** the gap's glowing rim pulses red when you're on course to hit that wall.
-3. **Forgiving hitbox:** the collision radius shrinks to 80% (`forgivingScale`), so near-misses go the player's way.
+| Group | Aid | Default |
+|---|---|---|
+| In world | Shadow on wall | On |
+| In world | Rim warning | On |
+| Interface | Target markers | **Off** |
+| Rules | Forgiving hitbox | On |
+
+1. **Shadow on wall (in world).**
+   - The ship's shadow on the next wall, cast along the flight path (the fake light is directly behind the ship), so it's right at any heading.
+   - It's plain dark, with no UI colour.
+   - **It's clipped by the gap, like a real shadow.** A shader discards the shadow wherever the wall has a hole, using the same gap shape as the collision test. So the shadow is fully on the wall when you'll hit and gone when you'll pass cleanly. **When you're about to clip the rim, it's cut in half by the hole's edge**, so near-misses read without any UI.
+   - A soft **penumbra** blob around the true-size silhouette grows with distance (wingspan plus 5% of the distance), as a real soft shadow does. That keeps the spot findable from about a second out, with no markers.
+   - It's drawn at full darkness. Lighter versions disappeared against the half-black hazard stripes.
+   - Works with the ship-light dimming described under Lighting.
+2. **Rim warning (in world):** the gap's glowing rim pulses red when you're on course to hit that wall. It's part of the world, since the rim already glows.
+3. **Target markers (interface, off by default):**
+   - At the crossing point: the ship's true-size outline, a ring for the actual hitbox, and corner brackets that stay about 5% of the distance across so they're readable from afar.
+   - Red on a hit course, cyan floating in the gap on a pass.
+   - They were the first version of the "shadow". In playtesting they made the game feel like steering a cursor into a circle, which led to the guiding principle above. They're kept only for comparison.
+   - Implementation notes: bracket bars are thin meshes because WebGL lines are always 1 pixel wide. Colours are moderate HDR values; brighter ones were desaturated to pink by the tone mapper.
+4. **Forgiving hitbox (rule):** the collision radius shrinks to 80% (`forgivingScale`), so near-misses go the player's way. It's invisible, which fits the principle.
 
 **Timing:** the cues fade in from 2.0 s before the wall and are at full strength from 0.6 s (`fadeStart`, `fadeFull`), so walls far ahead stay uncluttered.
 
@@ -129,4 +156,5 @@ The camera is about 6 units behind the ship, so a wall the ship has just passed 
 - **Scale:** what did "like Stardew Valley" mean?
 - **Sound:** none yet.
 - **Performance** on a real device, especially with bloom.
+- **More in-world cues** to try before adding any UI: engine sound or a hum that rises when you're on course to hit, the wall's surface lighting up where the ship will cross, or dust/air disturbed by a near-miss.
 - **Flight aids:** which combination should ship by default? This is what the toggles are for.
