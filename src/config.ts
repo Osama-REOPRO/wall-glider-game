@@ -62,6 +62,11 @@ export const CONFIG = {
     fadeStart: 2.0,
     /** ...and are at full strength from this many seconds out. */
     fadeFull: 0.6,
+    /** Default distance (world units) from the wall at which the shadow starts to appear. Adjustable in the Aids panel. */
+    shadowDistance: 20,
+    /** Range offered by the Aids panel slider. */
+    shadowDistanceMin: 4,
+    shadowDistanceMax: 60,
     /** Shadow edge blur (penumbra half-width) per unit of distance between the ship and the wall. */
     shadowSoftness: 0.03,
     /** Edge blur at contact: crisp, but anti-aliased. */

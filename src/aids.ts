@@ -21,7 +21,12 @@ export interface AidSettings {
   markers: boolean;
   /** Rules: smaller collision radius. */
   forgiving: boolean;
+  /** Distance from the wall (world units) at which the shadow starts to appear. */
+  shadowDistance: number;
 }
+
+/** The on/off aids (everything except numeric settings). */
+export type AidToggle = { [K in keyof AidSettings]: AidSettings[K] extends boolean ? K : never }[keyof AidSettings];
 
 // Interface markers are off by default: cues should live in the world (see docs/DESIGN.md, "Guiding principles").
 // The newer in-world cues start off so they can be tried one at a time.
@@ -34,6 +39,7 @@ export const DEFAULT_AIDS: AidSettings = {
   dust: false,
   markers: false,
   forgiving: true,
+  shadowDistance: CONFIG.aids.shadowDistance,
 };
 
 export interface Prediction {
@@ -258,13 +264,16 @@ export class WallShadow {
     this.group.visible = false;
   }
 
-  show(p: Prediction, shipPos: THREE.Vector3, bank: number, speed: number): void {
+  /**
+   * @param startDist distance from the wall at which the shadow starts to appear (Aids panel setting).
+   * It reaches full strength at half that distance.
+   */
+  show(p: Prediction, shipPos: THREE.Vector3, bank: number, startDist: number): void {
     // Distance straight down the tunnel to the wall's face, and the fade-in from it.
     const faceZ = p.point.z;
     const dist = shipPos.z - faceZ;
-    const { fadeStart, fadeFull, shadowSoftness, shadowMinSoft } = CONFIG.aids;
-    const tta = dist / Math.max(1, speed);
-    const strength = THREE.MathUtils.smoothstep(fadeStart - tta, 0, fadeStart - fadeFull);
+    const { shadowSoftness, shadowMinSoft } = CONFIG.aids;
+    const strength = THREE.MathUtils.smoothstep(startDist - dist, 0, startDist * 0.5);
     if (dist <= 0 || strength <= 0) {
       this.hide();
       return;

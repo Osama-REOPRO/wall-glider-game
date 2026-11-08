@@ -1,5 +1,6 @@
 import type { Quality } from './renderer';
-import { DEFAULT_AIDS, type AidSettings } from './aids';
+import { DEFAULT_AIDS, type AidSettings, type AidToggle } from './aids';
+import { CONFIG } from './config';
 
 const BEST_KEY = 'wall-glider.best';
 const QUALITY_KEY = 'wall-glider.quality';
@@ -74,7 +75,7 @@ export class Hud {
     // Aids panel: the button opens/closes it; each checkbox toggles one aid.
     button(this.aidsBtn, () => this.setAidsPanel(this.aidsPanel.hidden !== false));
     this.aidsPanel.addEventListener('pointerdown', (e) => e.stopPropagation());
-    const boxes: [keyof AidSettings, string][] = [
+    const boxes: [AidToggle, string][] = [
       ['shadow', 'aid-shadow'],
       ['rim', 'aid-rim'],
       ['arcs', 'aid-arcs'],
@@ -92,6 +93,20 @@ export class Hud {
         writeStorage(AIDS_KEY, JSON.stringify(this.aids));
       });
     }
+
+    // Shadow distance slider.
+    const slider = document.getElementById('aid-shadow-distance') as HTMLInputElement;
+    const sliderValue = document.getElementById('aid-shadow-distance-value')!;
+    slider.min = String(CONFIG.aids.shadowDistanceMin);
+    slider.max = String(CONFIG.aids.shadowDistanceMax);
+    slider.value = String(this.aids.shadowDistance);
+    const showDistance = () => (sliderValue.textContent = `${this.aids.shadowDistance} m`);
+    showDistance();
+    slider.addEventListener('input', () => {
+      this.aids.shadowDistance = Number(slider.value);
+      showDistance();
+      writeStorage(AIDS_KEY, JSON.stringify(this.aids));
+    });
     this.renderBest();
   }
 
