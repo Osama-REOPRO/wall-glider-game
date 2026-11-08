@@ -49,6 +49,19 @@ export const CONFIG = {
     /** How far ahead of the ship the camera aims. */
     lookAhead: 32,
   },
+  /** Free-flight mode: open space, no tube, no obstacles. */
+  space: {
+    speed: 30,
+    /** Pitch limit in free flight (radians). Yaw is unlimited. */
+    maxPitch: 1.4,
+    skyRadius: 850,
+    stars: 2600,
+    sunDirection: [0.6, 0.35, -0.7],
+    planetPosition: [-330, 110, -520],
+    /** Side of the cube of dust that wraps around the ship. */
+    dustBox: 140,
+    dustCount: 2200,
+  },
   particles: {
     max: 2400,
     /** How far ahead the dust motes reach. */

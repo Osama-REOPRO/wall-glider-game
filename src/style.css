@@ -77,6 +77,30 @@ html, body {
   letter-spacing: 0.12em;
 }
 
+#exit {
+  pointer-events: auto;
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 14px);
+  left: max(16px, env(safe-area-inset-left, 0px));
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(95, 243, 255, 0.4);
+  background: rgba(5, 6, 13, 0.4);
+  color: var(--fg);
+  font: 600 12px/1 inherit;
+  letter-spacing: 0.08em;
+}
+
+#readout {
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  margin-top: 4px;
+}
+
 #overlay {
   position: fixed;
   inset: 0;
@@ -104,6 +128,32 @@ html, body {
 }
 
 #overlay p { margin: 0; font-size: 16px; color: var(--muted); }
+
+#modes {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 22px;
+}
+#modes button {
+  pointer-events: auto;
+  min-width: 132px;
+  height: 44px;
+  padding: 0 18px;
+  border-radius: 22px;
+  border: 1px solid rgba(95, 243, 255, 0.55);
+  background: rgba(5, 6, 13, 0.55);
+  color: var(--fg);
+  font: 700 14px/1 inherit;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+#modes button:active, #exit:active, #quality:active { background: rgba(95, 243, 255, 0.2); }
+#modes button:focus-visible, #exit:focus-visible, #quality:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+[hidden] { display: none !important; }
+/* The overlay fades out instead of disappearing, so its buttons must stop taking taps while hidden. */
+#overlay:not(.visible) #modes button { pointer-events: none; }
 
 #overlay-cta {
   margin-top: 18px !important;

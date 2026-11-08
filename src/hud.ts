@@ -19,10 +19,12 @@ function writeStorage(key: string, value: string): void {
   }
 }
 
-/** DOM overlay: score, best score, title/game-over card, quality toggle. */
+/** DOM overlay: score, best score, menu and game-over card, mode buttons, free-flight readout, quality toggle. */
 export class Hud {
   private scoreEl = document.getElementById('score')!;
   private bestEl = document.getElementById('best')!;
+  private readoutEl = document.getElementById('readout')!;
+  private exitBtn = document.getElementById('exit') as HTMLButtonElement;
   private overlay = document.getElementById('overlay')!;
   private title = this.overlay.querySelector('h1')!;
   private sub = document.getElementById('overlay-sub')!;
@@ -31,16 +33,27 @@ export class Hud {
   best = Number(readStorage(BEST_KEY) ?? 0) || 0;
 
   onQualityChange: ((q: Quality) => void) | null = null;
+  onTunnel: (() => void) | null = null;
+  onFree: (() => void) | null = null;
+  onExit: (() => void) | null = null;
 
   constructor() {
-    this.qualityBtn.addEventListener('pointerdown', (e) => e.stopPropagation());
-    this.qualityBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
+    const button = (el: HTMLElement, fn: () => void) => {
+      el.addEventListener('pointerdown', (e) => e.stopPropagation());
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        fn();
+      });
+    };
+    button(this.qualityBtn, () => {
       const q: Quality = this.qualityBtn.textContent === 'HI' ? 'low' : 'high';
       this.setQualityLabel(q);
       writeStorage(QUALITY_KEY, q);
       this.onQualityChange?.(q);
     });
+    button(document.getElementById('mode-tunnel')!, () => this.onTunnel?.());
+    button(document.getElementById('mode-free')!, () => this.onFree?.());
+    button(this.exitBtn, () => this.onExit?.());
     this.renderBest();
   }
 
@@ -62,8 +75,9 @@ export class Hud {
     }
   }
 
-  showScore(visible: boolean): void {
+  private showScore(visible: boolean): void {
     this.scoreEl.style.visibility = visible ? 'visible' : 'hidden';
+    this.bestEl.hidden = !visible;
   }
 
   showTitle(): void {
@@ -72,6 +86,7 @@ export class Hud {
     this.cta.textContent = 'Tap to start';
     this.overlay.classList.add('visible');
     this.showScore(false);
+    this.setFreeFlight(false);
   }
 
   showGameOver(score: number): void {
@@ -89,7 +104,29 @@ export class Hud {
 
   hideOverlay(): void {
     this.overlay.classList.remove('visible');
+  }
+
+  /** Tunnel run: score visible. */
+  showRun(): void {
+    this.hideOverlay();
+    this.setFreeFlight(false);
     this.showScore(true);
+  }
+
+  /** Free flight: no score; heading readout and a way back to the menu. */
+  showFreeFlight(): void {
+    this.hideOverlay();
+    this.showScore(false);
+    this.setFreeFlight(true);
+  }
+
+  setReadout(text: string): void {
+    this.readoutEl.textContent = text;
+  }
+
+  private setFreeFlight(on: boolean): void {
+    this.readoutEl.hidden = !on;
+    this.exitBtn.hidden = !on;
   }
 
   private renderBest(): void {

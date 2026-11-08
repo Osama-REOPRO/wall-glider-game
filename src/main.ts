@@ -10,16 +10,20 @@ import { Obstacles, ZONES } from './obstacles';
 import { Particles, Dust } from './particles';
 import { checkCollision } from './collision';
 import { Hud } from './hud';
+import { Space } from './space';
 
 type State = 'title' | 'playing' | 'dead';
+/** 'tunnel' is the game. 'free' is open space with no obstacles, for testing the controls. */
+type Mode = 'tunnel' | 'free';
 
 const canvas = document.getElementById('game') as HTMLCanvasElement;
 
 // --- Scene -----------------------------------------------------------------
 const scene = new THREE.Scene();
 const fogColor = new THREE.Color(0x05060d);
+const tunnelFog = new THREE.FogExp2(fogColor, 0.0048);
 scene.background = fogColor;
-scene.fog = new THREE.FogExp2(fogColor, 0.0048);
+scene.fog = tunnelFog;
 
 const camera = new THREE.PerspectiveCamera(CONFIG.camera.fov, window.innerWidth / window.innerHeight, 0.05, 900);
 const renderer = new Renderer(canvas, scene, camera);
@@ -38,6 +42,9 @@ const dust = new Dust();
 // Short-lived light for explosions.
 const blastLight = new THREE.PointLight(0xff9a40, 0, 80, 1.3);
 scene.add(tube.mesh, ship.group, obstacles.group, particles.points, dust.points, blastLight);
+const space = new Space();
+space.group.visible = false;
+scene.add(space.group);
 
 const input = new SteerInput(canvas);
 const hud = new Hud();
@@ -46,6 +53,7 @@ function applyViewport(): void {
   const h = renderer.gl.domElement.height;
   particles.setViewport(h, camera.fov);
   dust.setViewport(h, camera.fov);
+  space.setViewport(h, camera.fov);
 }
 hud.onQualityChange = (q) => {
   renderer.setQuality(q);
@@ -58,6 +66,8 @@ applyViewport();
 
 // --- Game state ------------------------------------------------------------
 let state: State = 'title';
+let mode: Mode = 'tunnel';
+let readoutTimer = 0;
 let score = 0;
 let deadTime = 0;
 let timeScale = 1;
@@ -101,15 +111,53 @@ function resetWorld(): void {
   hud.setScore(0);
   timeScale = 1;
   blastLight.intensity = 0;
+  // Snap the camera behind the ship so a mode change doesn't swoop across the world.
+  camPos.set(0, CONFIG.camera.height, CONFIG.camera.distance);
+  camLook.set(0, 0, -CONFIG.camera.lookAhead);
   renderer.setAberration(0);
 }
 
+/** Show the scenery for a mode and set the matching control limits. */
+function setMode(m: Mode): void {
+  mode = m;
+  const tunnel = m === 'tunnel';
+  tube.mesh.visible = tunnel;
+  obstacles.group.visible = tunnel;
+  dust.points.visible = tunnel;
+  space.group.visible = !tunnel;
+  scene.fog = tunnel ? tunnelFog : null;
+  input.limits = tunnel ? 'cone' : 'free';
+  ship.axisBank = tunnel;
+}
+
 function startGame(): void {
+  setMode('tunnel');
   resetWorld();
   state = 'playing';
   input.enabled = true;
-  hud.hideOverlay();
+  hud.showRun();
 }
+
+function startFreeFlight(): void {
+  setMode('free');
+  resetWorld();
+  ship.speed = CONFIG.space.speed;
+  state = 'playing';
+  input.enabled = true;
+  hud.showFreeFlight();
+}
+
+function toMenu(): void {
+  setMode('tunnel');
+  resetWorld();
+  state = 'title';
+  input.enabled = false;
+  hud.showTitle();
+}
+
+hud.onTunnel = startGame;
+hud.onFree = startFreeFlight;
+hud.onExit = toMenu;
 
 function crash(point: THREE.Vector3): void {
   state = 'dead';
@@ -131,6 +179,7 @@ function crash(point: THREE.Vector3): void {
 }
 
 input.onPress = () => {
+  if (mode === 'free') return;
   if (state === 'title') startGame();
   else if (state === 'dead' && deadTime > 0.9) startGame();
 };
@@ -193,7 +242,33 @@ function autopilot(): [number, number] {
   return [yaw, pitch];
 }
 
+/** Free flight: a plain chase camera behind and above the ship's heading. */
+function updateFreeCamera(dt: number): void {
+  const C = CONFIG.camera;
+  const p = ship.position;
+  tmpA.copy(p).addScaledVector(ship.direction, -C.distance);
+  tmpA.y += C.height;
+  tmpB.copy(p).addScaledVector(ship.direction, C.lookAhead * 0.5);
+  camPos.lerp(tmpA, 1 - Math.exp(-9 * dt));
+  camLook.lerp(tmpB, 1 - Math.exp(-12 * dt));
+  camera.position.copy(camPos);
+  camera.lookAt(camLook);
+}
+
+function updateReadout(dt: number): void {
+  readoutTimer -= dt;
+  if (readoutTimer > 0) return;
+  readoutTimer = 0.1;
+  const deg = THREE.MathUtils.radToDeg;
+  const heading = ((deg(ship.yaw) % 360) + 360) % 360;
+  hud.setReadout(`HDG ${heading.toFixed(0).padStart(3, '0')}° · PITCH ${deg(ship.pitch).toFixed(0)}° · ${ship.speed.toFixed(0)} u/s`);
+}
+
 function updateCamera(dt: number, realDt: number): void {
+  if (mode === 'free') {
+    updateFreeCamera(dt);
+    return;
+  }
   const C = CONFIG.camera;
   const f = C.follow;
   const p = ship.position;
@@ -249,7 +324,11 @@ function frame(now: number): void {
   }
   const dt = realDt * timeScale;
 
-  if (state === 'title') {
+  if (mode === 'free') {
+    ship.speed = CONFIG.space.speed;
+    ship.update(dt, input.yaw, input.pitch); // no collisions in free flight
+    updateReadout(realDt);
+  } else if (state === 'title') {
     const [yaw, pitch] = autopilot();
     ship.speed = CONFIG.ship.startSpeed * 0.8;
     ship.update(dt, yaw, pitch); // attract mode: no collisions
@@ -269,19 +348,26 @@ function frame(now: number): void {
 
   if (state !== 'dead') emitTrail(dt);
 
-  obstacles.update(dt, ship.position.z);
-  tube.update(ship.position.z);
-  dust.update(ship.position.z);
+  if (mode === 'tunnel') {
+    obstacles.update(dt, ship.position.z);
+    tube.update(ship.position.z);
+    dust.update(ship.position.z);
+  }
   particles.update(dt);
   if (blastLight.intensity > 0) blastLight.intensity = Math.max(0, blastLight.intensity * Math.exp(-3.5 * realDt) - 0.5);
   updateCamera(dt, realDt);
+  if (mode === 'free') space.update(dt, camera, ship.position);
   renderer.setAberration(state === 'dead' ? shake * 0.08 : 0.004 + (ship.speed - CONFIG.ship.startSpeed) * 0.0006);
   renderer.render();
   requestAnimationFrame(frame);
 }
 
-resetWorld();
-hud.showTitle();
+// A link ending in #free opens straight into free flight.
+if (location.hash === '#free') startFreeFlight();
+else toMenu();
+window.addEventListener('hashchange', () => {
+  if (location.hash === '#free' && mode !== 'free') startFreeFlight();
+});
 requestAnimationFrame(frame);
 
 // Debug/test hooks (used by automated browser tests).
@@ -292,9 +378,14 @@ requestAnimationFrame(frame);
   get score() {
     return score;
   },
+  get mode() {
+    return mode;
+  },
   ship,
   input,
   obstacles,
   fps: () => frameTimes.length / frameTimes.reduce((a, b) => a + b, 0),
   start: startGame,
+  startFree: startFreeFlight,
+  menu: toMenu,
 };

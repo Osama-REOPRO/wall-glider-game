@@ -14,12 +14,18 @@
     <div id="hud">
       <div id="score">0</div>
       <div id="best"></div>
+      <div id="readout" hidden></div>
+      <button id="exit" type="button" hidden>&larr; Menu</button>
       <button id="quality" type="button" aria-label="Toggle graphics quality">HI</button>
     </div>
     <div id="overlay" class="visible">
       <h1>WALL GLIDER</h1>
       <p id="overlay-sub">Drag to steer. Fly through the gaps.</p>
       <p id="overlay-cta" class="pulse">Tap to start</p>
+      <div id="modes">
+        <button id="mode-tunnel" type="button">Tunnel</button>
+        <button id="mode-free" type="button">Free flight</button>
+      </div>
     </div>
     <script type="module" src="./src/main.ts"></script>
   </body>

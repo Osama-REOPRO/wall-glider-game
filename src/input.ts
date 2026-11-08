@@ -16,6 +16,11 @@ export class SteerInput {
   private lastX = 0;
   private lastY = 0;
   enabled = false;
+  /**
+   * 'cone': heading stays within CONFIG.ship.maxAngle of the tube axis (tunnel mode).
+   * 'free': unlimited yaw, pitch capped short of straight up/down (free flight).
+   */
+  limits: 'cone' | 'free' = 'cone';
 
   constructor(target: HTMLElement) {
     target.addEventListener('pointerdown', (e) => {
@@ -63,8 +68,14 @@ export class SteerInput {
     this.pitch = 0;
   }
 
-  /** Keep the heading inside a cone around the tube axis so the ship can never turn backwards. */
+  /** Keep the heading inside the current limits. */
   private clamp(): void {
+    if (this.limits === 'free') {
+      const mp = CONFIG.space.maxPitch;
+      this.pitch = Math.max(-mp, Math.min(mp, this.pitch));
+      return;
+    }
+    // Tunnel: a cone around the tube axis, so the ship can never turn backwards.
     const max = CONFIG.ship.maxAngle;
     const mag = Math.hypot(this.yaw, this.pitch);
     if (mag > max) {

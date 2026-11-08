@@ -18,6 +18,8 @@ export class Ship {
   yaw = 0;
   pitch = 0;
   private roll = 0;
+  /** Tunnel mode adds extra bank from the heading's offset to the tube axis. Off in free flight. */
+  axisBank = true;
   private time = 0;
 
   constructor() {
@@ -120,7 +122,8 @@ export class Ship {
     this.pitch += (targetPitch - this.pitch) * k;
     const yawRate = dt > 0 ? (this.yaw - prevYaw) / dt : 0;
     // Bank into turns: right turn → right wing down. A little roll also comes from the heading itself.
-    const targetRoll = THREE.MathUtils.clamp(-yawRate * 0.35 - this.yaw * 0.6, -1.1, 1.1);
+    const axisRoll = this.axisBank ? -this.yaw * 0.6 : 0;
+    const targetRoll = THREE.MathUtils.clamp(-yawRate * 0.35 + axisRoll, -1.1, 1.1);
     this.roll += (targetRoll - this.roll) * (1 - Math.exp(-8 * dt));
 
     const cp = Math.cos(this.pitch);
