@@ -100,7 +100,7 @@ The camera is about 6 units behind the ship, so a wall the ship has just passed 
 
 | Option | Verdict |
 |---|---|
-| Real shadow from a light (Mario style) | A light's shadow only lines up with your path when you fly straight at the wall, so it's misleading when turning. Shadow maps are also costly on mobile. We used the idea but cast the shadow **along the flight path** instead. |
+| Real shadow from a light (Mario style) | Shadow maps are costly on mobile, so the shadow is a fake decal. It was first cast **along the flight path**, which looked unnatural. It's now cast **perpendicular to the wall**, like a real shadow from a light straight down the tunnel. |
 | Reflection of the ship in the wall | Needs a second render of the scene. A mirror image shows distance but not where you'll pass relative to the gap. Rejected. |
 | Ship headlight (spotlight pool) | A soft pool alone is hard to read precisely at speed. The ship light now does part of this job: it keeps a steady pool on the approaching wall, with the shadow inside it. |
 | Aim line from the nose | Exact and cheap, but feels gamey. Not built. |
@@ -118,9 +118,11 @@ The camera is about 6 units behind the ship, so a wall the ship has just passed 
 | Rules | Forgiving hitbox | On |
 
 1. **Shadow on wall (in world).**
-   - The ship's shadow on the next wall, cast along the flight path (the fake light is directly behind the ship), so it's right at any heading.
+   - The ship's shadow on the next wall, **cast perpendicular to the wall**, as if lit from straight down the tunnel behind the ship. It sits at the ship's current x/y on the wall's face.
+   - **Why perpendicular, not along the heading:** the first version projected the shadow from the ship's nose along its heading, so it showed where the ship *would* hit. That looked unnatural: when turning, the shadow ran ahead of the ship and slid around independently of it, which no real shadow does. A perpendicular shadow behaves like a real one. It's always directly "under" the ship from the wall's point of view, and as the ship closes in, ship and shadow converge on the impact point. It still warns of the approaching wall, through the growing darkness and the clipping below. Looking ahead at the predicted impact point is left to the rim warning.
    - It's plain dark, with no UI colour.
-   - **It's clipped by the gap, like a real shadow.** A shader discards the shadow wherever the wall has a hole, using the same gap shape as the collision test. So the shadow is fully on the wall when you'll hit and gone when you'll pass cleanly. **When you're about to clip the rim, it's cut in half by the hole's edge**, so near-misses read without any UI.
+   - **It's clipped by the gap, like a real shadow.** A shader discards the shadow wherever the wall has a hole, using the same gap shape as the collision test. So the shadow is on the wall while the ship is lined up with solid wall and gone while it's lined up with the gap. **When the ship overlaps the rim, the shadow is cut by the hole's edge**, so near-misses read without any UI.
+   - Its fade-in uses the straight-line distance down the tunnel to the wall, not the predicted path.
    - A soft **penumbra** blob around the true-size silhouette grows with distance (wingspan plus 5% of the distance), as a real soft shadow does. That keeps the spot findable from about a second out, with no markers.
    - It's drawn at full darkness. Lighter versions disappeared against the half-black hazard stripes.
    - Works with the ship-light dimming described under Lighting.

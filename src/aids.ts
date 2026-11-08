@@ -160,10 +160,11 @@ const shadowFragment = /* glsl */ `
 `;
 
 /**
- * In-world aid: the ship's shadow on the next wall, cast along the flight path (not by a light), so it
- * is right at any heading. It is plain dark, with no UI colour, and it is clipped by the gap like a
- * real shadow: fully on the wall on a hit course, gone on a clean pass, and partly cut off when the
- * ship is about to clip the rim.
+ * In-world aid: the ship's shadow on the next wall, cast perpendicular to the wall (as if lit from
+ * straight down the tunnel behind the ship), so it sits exactly where the ship is right now. It is plain
+ * dark, with no UI colour, and it is clipped by the gap like a real shadow: on the wall while the ship is
+ * lined up with the wall, gone while it is lined up with the gap, and cut by the gap's edge when it
+ * overlaps the rim. As the ship closes in, its position and its shadow converge on the impact point.
  * A soft blob around the true-size silhouette acts as a penumbra: it grows softer and lighter with
  * distance, as a real soft shadow does, which keeps the spot findable from far away.
  */
@@ -215,26 +216,32 @@ export class WallShadow {
     this.group.visible = false;
   }
 
-  show(p: Prediction, bank: number, speed: number): void {
-    if (p.outcome === 'tube' || p.strength <= 0) {
+  show(p: Prediction, shipPos: THREE.Vector3, bank: number, speed: number): void {
+    // Distance straight down the tunnel to the wall's face, and the fade-in from it.
+    const faceZ = p.point.z;
+    const dist = shipPos.z - faceZ;
+    const { fadeStart, fadeFull } = CONFIG.aids;
+    const tta = dist / Math.max(1, speed);
+    const strength = THREE.MathUtils.smoothstep(fadeStart - tta, 0, fadeStart - fadeFull);
+    if (dist <= 0 || strength <= 0) {
       this.hide();
       return;
     }
     const o = p.obstacle;
     this.group.visible = true;
-    this.group.position.set(p.point.x, p.point.y, p.point.z + 0.05);
+    // Perpendicular projection: the ship's own x/y, on the wall's face.
+    this.group.position.set(shipPos.x, shipPos.y, faceZ + 0.05);
     this.silhouette.rotation.z = bank;
     // Clip against the gap as it looks now (the bevel makes the visible hole slightly smaller).
     this.hole.uKind.value = o.kind === 'circle' ? 0 : 1;
     this.hole.uHole.value.set(o.cx, o.cy, o.r - BEVEL);
     this.hole.uAngle.value = o.angle;
-    // Penumbra: about the wingspan up close, wider (and a little fainter) with distance. It has to stay
-    // dark enough to read against the high-contrast hazard stripes.
-    const dist = p.timeToImpact * speed;
+    // Penumbra: about the wingspan up close, wider with distance. Full darkness so it reads against
+    // the high-contrast hazard stripes.
     const half = 0.62 * CONFIG.ship.scale + dist * 0.05;
     this.blob.scale.setScalar(half);
-    this.blobUniforms.uOpacity.value = p.strength;
-    this.fillUniforms.uOpacity.value = p.strength;
+    this.blobUniforms.uOpacity.value = strength;
+    this.fillUniforms.uOpacity.value = strength;
   }
 }
 

@@ -252,7 +252,7 @@ function updateAids(yaw: number, pitch: number): void {
     return;
   }
   if (hud.aids.rim && prediction.outcome === 'wall') prediction.obstacle.warn = prediction.strength;
-  if (hud.aids.shadow) shadow.show(prediction, ship.bank, ship.speed);
+  if (hud.aids.shadow) shadow.show(prediction, ship.position, ship.bank, ship.speed);
   else shadow.hide();
   if (hud.aids.markers) marker.show(prediction, ship.bank, radius, ship.speed);
   else marker.hide();
