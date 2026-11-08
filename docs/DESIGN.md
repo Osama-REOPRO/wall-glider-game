@@ -114,6 +114,10 @@ The camera is about 6 units behind the ship, so a wall the ship has just passed 
 |---|---|---|
 | In world | Shadow on wall | On |
 | In world | Rim warning | On |
+| In world | Electric arcs | Off |
+| In world | Headlight | Off |
+| In world | Wall heat glow | Off |
+| In world | Bow-wave dust | Off |
 | Interface | Target markers | **Off** |
 | Rules | Forgiving hitbox | On |
 
@@ -136,6 +140,13 @@ The camera is about 6 units behind the ship, so a wall the ship has just passed 
    - They were the first version of the "shadow". In playtesting they made the game feel like steering a cursor into a circle, which led to the guiding principle above. They're kept only for comparison.
    - Implementation notes: bracket bars are thin meshes because WebGL lines are always 1 pixel wide. Colours are moderate HDR values; brighter ones were desaturated to pink by the tone mapper.
 4. **Forgiving hitbox (rule):** the collision radius shrinks to 80% (`forgivingScale`), so near-misses go the player's way. It's invisible, which fits the principle.
+
+5. **More in-world cues to compare (off by default).** The designer asked for creative alternatives to the shadow that stay in the world. Each is its own toggle in the In world group, so they can be mixed and compared. Code: `src/worldcues.ts`.
+   - **Electric arcs** (the designer's idea): lightning jumps between the ship and the **closest point on the nearest surface**. That's the next wall's face, the gap's rim when you're lined up with the gap, or the tunnel wall. It starts 14 units from a wall (`arcRange`) and 4 from the tunnel (`arcTubeRange`). Bolts get thicker, brighter and more frequent as the gap closes, and throw sparks where they land. Because they reach for the nearest edge, they're strongest exactly when you're about to clip the rim. Bolts are camera-facing ribbons with midpoint-displacement jaggedness, regenerated about 18 times a second so they flicker.
+   - **Headlight:** a narrow spotlight from the nose along the heading. A fixed cone naturally gives a wide, dim pool far away and a small, bright one up close. Lined up with a gap, the beam falls through the hole and the pool vanishes, so no pool means you're clear. It's capped near the wall so it doesn't flare to white, and always in the scene at intensity 0 when off, so toggling doesn't rebuild shaders.
+   - **Wall heat glow:** the wall glows cyan where the ship is lined up with it (straight down the tunnel, like the shadow): a faint wide haze far away that tightens into a white-hot spot, with ripples like a pushed force field. Clipped by the gap. It reads well against the dark stripes, where a shadow struggles.
+   - **Bow-wave dust:** dust pushed ahead of the ship along its heading at nearly twice the ship's speed. It splashes on the wall where the ship would hit, or streams on through the gap. Unlike the shadow and heat glow, it shows the **heading**, not just the position, with no marker.
+   - All cues drawn on a wall share one gap-clipping shader snippet (`GAP_GLSL`) and the bevelled face position, so they lie exactly on the surface the player sees.
 
 **Timing:** the cues fade in from 2.0 s before the wall and are at full strength from 0.6 s (`fadeStart`, `fadeFull`), so walls far ahead stay uncluttered.
 
@@ -161,5 +172,5 @@ The camera is about 6 units behind the ship, so a wall the ship has just passed 
 - **Scale:** what did "like Stardew Valley" mean?
 - **Sound:** none yet.
 - **Performance** on a real device, especially with bloom.
-- **More in-world cues** to try before adding any UI: engine sound or a hum that rises when you're on course to hit, the wall's surface lighting up where the ship will cross, or dust/air disturbed by a near-miss.
+- **Which in-world cues to keep:** shadow, rim warning, arcs, headlight, heat glow and bow-wave dust are all built and toggleable. Pick the combination that reads best without pulling attention off the ship. Still untried: a proximity sound (a hum that rises on a collision course).
 - **Flight aids:** which combination should ship by default? This is what the toggles are for.

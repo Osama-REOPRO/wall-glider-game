@@ -94,7 +94,7 @@ html, body {
   display: flex;
   align-items: center;
   gap: 10px;
-  min-height: 40px;
+  min-height: 36px;
   font-size: 14px;
   color: var(--fg);
 }

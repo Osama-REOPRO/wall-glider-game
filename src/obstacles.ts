@@ -153,6 +153,37 @@ export class Obstacle {
     return Math.abs(p.y - this.cy) <= this.r - margin;
   }
 
+  /**
+   * Closest point on this wall's solid surface to a point in front of (or inside) it: straight onto
+   * the face when lined up with solid wall, or onto the gap's rim when lined up with the gap.
+   * Used by the electric-arc cue.
+   */
+  closestPoint(px: number, py: number, pz: number, out: THREE.Vector3): THREE.Vector3 {
+    const half = CONFIG.obstacles.thickness / 2;
+    const p = this.toLocal(px, py, tmp2);
+    let lx = p.x;
+    let ly = p.y;
+    let z = this.z + half + 0.08; // the face toward the ship (plus its bevel)
+    const r = this.r - 0.08; // visible hole (the bevel narrows it)
+    if (this.kind === 'circle') {
+      const dx = lx - this.cx;
+      const dy = ly - this.cy;
+      const d = Math.hypot(dx, dy);
+      if (d < r) {
+        const k = d > 1e-4 ? r / d : 0;
+        lx = this.cx + (d > 1e-4 ? dx * k : r);
+        ly = this.cy + dy * k;
+        z = THREE.MathUtils.clamp(pz, this.z - half, this.z + half); // the rim's inner surface
+      }
+    } else if (Math.abs(ly - this.cy) < r) {
+      ly = this.cy + Math.sign(ly - this.cy || 1) * r;
+      z = THREE.MathUtils.clamp(pz, this.z - half, this.z + half);
+    }
+    const c = Math.cos(this.angle);
+    const s = Math.sin(this.angle);
+    return out.set(lx * c - ly * s, lx * s + ly * c, z);
+  }
+
   /** World-space centre of the gap (used by the attract-mode autopilot). */
   gapCenter(out: THREE.Vector2): THREE.Vector2 {
     const c = Math.cos(this.angle);

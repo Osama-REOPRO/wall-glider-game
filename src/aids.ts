@@ -9,6 +9,14 @@ export interface AidSettings {
   shadow: boolean;
   /** In world: the gap rim pulses red on a hit course. */
   rim: boolean;
+  /** In world: electric arcs jump between the ship and the nearest surface. */
+  arcs: boolean;
+  /** In world: a forward spotlight whose pool tightens on the wall ahead. */
+  headlight: boolean;
+  /** In world: the wall glows where the ship is lined up with it. */
+  heat: boolean;
+  /** In world: dust pushed ahead of the ship splashes where it will hit. */
+  dust: boolean;
   /** Interface: brackets, outline and hitbox ring at the crossing point. */
   markers: boolean;
   /** Rules: smaller collision radius. */
@@ -16,7 +24,17 @@ export interface AidSettings {
 }
 
 // Interface markers are off by default: cues should live in the world (see docs/DESIGN.md, "Guiding principles").
-export const DEFAULT_AIDS: AidSettings = { shadow: true, rim: true, markers: false, forgiving: true };
+// The newer in-world cues start off so they can be tried one at a time.
+export const DEFAULT_AIDS: AidSettings = {
+  shadow: true,
+  rim: true,
+  arcs: false,
+  headlight: false,
+  heat: false,
+  dust: false,
+  markers: false,
+  forgiving: true,
+};
 
 export interface Prediction {
   obstacle: Obstacle;
@@ -117,6 +135,32 @@ function bracketGeometry(): THREE.BufferGeometry {
 
 const PROFILE_N = REAR_PROFILE.length;
 
+/**
+ * GLSL for "is this world x/y inside the wall's gap?", mirroring Obstacle.fits() with no margin.
+ * Every in-world cue drawn on a wall's face uses it so it can be clipped like a real surface effect.
+ */
+export const GAP_GLSL = /* glsl */ `
+  uniform float uKind;   // 0 = circular hole, 1 = slot
+  uniform vec3 uHole;    // circle: centre x, y and radius; slot: (unused, offset, half-height)
+  uniform float uAngle;  // the wall's current rotation
+  bool inGap(vec2 w) {
+    float c = cos(-uAngle), sn = sin(-uAngle);
+    vec2 g = vec2(w.x * c - w.y * sn, w.x * sn + w.y * c);
+    return uKind < 0.5 ? length(g - uHole.xy) < uHole.z : abs(g.y - uHole.y) < uHole.z;
+  }
+`;
+
+export function gapUniforms(): Record<string, THREE.IUniform> {
+  return { uKind: { value: 0 }, uHole: { value: new THREE.Vector3() }, uAngle: { value: 0 } };
+}
+
+/** Point the gap uniforms at a wall (the bevel makes the visible hole slightly smaller). */
+export function setGapUniforms(u: Record<string, THREE.IUniform>, o: Obstacle): void {
+  u.uKind.value = o.kind === 'circle' ? 0 : 1;
+  (u.uHole.value as THREE.Vector3).set(o.cx, o.cy, o.r - BEVEL);
+  u.uAngle.value = o.angle;
+}
+
 const shadowVertex = /* glsl */ `
   uniform float uHalf;
   varying vec2 vLocal;
@@ -137,9 +181,6 @@ const shadowFragment = /* glsl */ `
   uniform vec2 uPoly[N];
   uniform float uSoft;     // penumbra half-width in world units
   uniform float uDark;     // darkness at the umbra
-  uniform float uKind;     // 0 = circular hole, 1 = slot
-  uniform vec3 uHole;      // circle: centre x, y and radius; slot: (unused, offset, half-height)
-  uniform float uAngle;    // the wall's current rotation
   varying vec2 vLocal;
   varying vec2 vWorld;
 
@@ -161,11 +202,10 @@ const shadowFragment = /* glsl */ `
     return s * sqrt(d);
   }
 
+  ${GAP_GLSL}
+
   void main() {
-    float c = cos(-uAngle), sn = sin(-uAngle);
-    vec2 g = vec2(vWorld.x * c - vWorld.y * sn, vWorld.x * sn + vWorld.y * c);
-    bool inGap = uKind < 0.5 ? length(g - uHole.xy) < uHole.z : abs(g.y - uHole.y) < uHole.z;
-    if (inGap) discard;
+    if (inGap(vWorld)) discard;
     float d = sdPolygon(vLocal);
     // The blur spreads outward from the silhouette, so the core stays dark even when the edge is wide
     // (the ship is thin from behind: a blur centred on the edge would wash the whole shadow out).
@@ -196,9 +236,7 @@ export class WallShadow {
       uHalf: { value: 1 },
       uSoft: { value: 0.02 },
       uDark: { value: 0 },
-      uKind: { value: 0 },
-      uHole: { value: new THREE.Vector3() },
-      uAngle: { value: 0 },
+      ...gapUniforms(),
     };
     this.mesh = new THREE.Mesh(
       new THREE.PlaneGeometry(2, 2),
@@ -236,10 +274,8 @@ export class WallShadow {
     // Perpendicular projection: the ship's own x/y, on the wall's face, turned with the ship's bank.
     this.group.position.set(shipPos.x, shipPos.y, faceZ + 0.05);
     this.mesh.rotation.z = bank;
-    // Clip against the gap as it looks now (the bevel makes the visible hole slightly smaller).
-    this.uniforms.uKind.value = o.kind === 'circle' ? 0 : 1;
-    (this.uniforms.uHole.value as THREE.Vector3).set(o.cx, o.cy, o.r - BEVEL);
-    this.uniforms.uAngle.value = o.angle;
+    // Clip against the gap as it looks now.
+    setGapUniforms(this.uniforms, o);
     // Penumbra: the edge blur grows with the ship's distance from the wall, like a real soft shadow.
     // A blurrier shadow spreads the same darkness over more area, so its core is lighter.
     const soft = shadowMinSoft + dist * shadowSoftness;

@@ -77,6 +77,10 @@ export class Hud {
     const boxes: [keyof AidSettings, string][] = [
       ['shadow', 'aid-shadow'],
       ['rim', 'aid-rim'],
+      ['arcs', 'aid-arcs'],
+      ['headlight', 'aid-headlight'],
+      ['heat', 'aid-heat'],
+      ['dust', 'aid-dust'],
       ['markers', 'aid-markers'],
       ['forgiving', 'aid-forgiving'],
     ];

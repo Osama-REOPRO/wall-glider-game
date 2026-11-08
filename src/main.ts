@@ -12,6 +12,7 @@ import { checkCollision } from './collision';
 import { Hud } from './hud';
 import { Space } from './space';
 import { WallShadow, TargetMarker, predict, hitRadius, type Prediction } from './aids';
+import { WorldCues } from './worldcues';
 
 type State = 'title' | 'playing' | 'dead';
 /** 'tunnel' is the game. 'free' is open space with no obstacles, for testing the controls. */
@@ -46,6 +47,7 @@ scene.add(tube.mesh, ship.group, obstacles.group, particles.points, dust.points,
 const shadow = new WallShadow();
 const marker = new TargetMarker();
 scene.add(shadow.group, marker.group);
+const cues = new WorldCues(scene, particles);
 const space = new Space();
 space.group.visible = false;
 scene.add(space.group);
@@ -262,6 +264,7 @@ function clearAids(): void {
   prediction = null;
   shadow.hide();
   marker.hide();
+  cues.clear();
   for (const o of obstacles.items) o.warn = 0;
 }
 
@@ -384,6 +387,7 @@ function frame(now: number): void {
   }
 
   if (state === 'dead' || mode === 'free') clearAids();
+  else cues.update({ dt, ship, obstacles, prediction, camera, aids: hud.aids });
   if (state !== 'dead') emitTrail(dt);
 
   if (mode === 'tunnel') {
@@ -439,6 +443,7 @@ requestAnimationFrame(frame);
   aids: hud.aids,
   shadow,
   marker,
+  cues,
   ship,
   input,
   obstacles,

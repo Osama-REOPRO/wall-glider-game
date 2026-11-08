@@ -66,6 +66,13 @@ export const CONFIG = {
     shadowSoftness: 0.03,
     /** Edge blur at contact: crisp, but anti-aliased. */
     shadowMinSoft: 0.02,
+    /** Electric arcs reach the next wall from this far away (world units)... */
+    arcRange: 14,
+    /** ...and the tunnel wall from this far. */
+    arcTubeRange: 4,
+    /** Headlight cone half-angle (radians): sets how fast the pool tightens. */
+    headlightAngle: 0.13,
+    headlightIntensity: 900,
   },
   /** Free-flight mode: open space, no tube, no obstacles. */
   space: {
