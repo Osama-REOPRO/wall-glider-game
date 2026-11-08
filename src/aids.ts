@@ -75,32 +75,19 @@ export function predict(
   return { obstacle: o, point, outcome, timeToImpact, strength };
 }
 
-/** The ship's silhouette seen from behind: flat wings, a small dorsal fin. World units at ship scale. */
+/** The ship's silhouette seen from behind (flat wings, small dorsal fin), in model units. */
+const REAR_PROFILE: [number, number][] = [
+  [-0.8, -0.05], [0.8, -0.05], [0.8, 0.04], [0.2, 0.09], [0, 0.32], [-0.2, 0.09], [-0.8, 0.04],
+];
+
+/** The rear silhouette as a shape, in world units at ship scale. */
 function rearProfile(): THREE.Shape {
   const k = CONFIG.ship.scale;
   const s = new THREE.Shape();
-  const pts: [number, number][] = [
-    [-0.8, -0.05], [0.8, -0.05], [0.8, 0.04], [0.2, 0.09], [0, 0.32], [-0.2, 0.09], [-0.8, 0.04],
-  ];
-  s.moveTo(pts[0][0] * k, pts[0][1] * k);
-  for (const [x, y] of pts.slice(1)) s.lineTo(x * k, y * k);
+  s.moveTo(REAR_PROFILE[0][0] * k, REAR_PROFILE[0][1] * k);
+  for (const [x, y] of REAR_PROFILE.slice(1)) s.lineTo(x * k, y * k);
   s.closePath();
   return s;
-}
-
-/** Shadow blob: solid core with a soft edge (alpha only; the material colour is black). */
-function blobTexture(): THREE.CanvasTexture {
-  const S = 128;
-  const c = document.createElement('canvas');
-  c.width = c.height = S;
-  const ctx = c.getContext('2d')!;
-  const g = ctx.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
-  g.addColorStop(0, 'rgba(255,255,255,1)');
-  g.addColorStop(0.55, 'rgba(255,255,255,0.9)');
-  g.addColorStop(1, 'rgba(255,255,255,0)');
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, S, S);
-  return new THREE.CanvasTexture(c);
 }
 
 /**
@@ -128,34 +115,62 @@ function bracketGeometry(): THREE.BufferGeometry {
   return g;
 }
 
+const PROFILE_N = REAR_PROFILE.length;
+
 const shadowVertex = /* glsl */ `
-  varying vec2 vUv;
+  uniform float uHalf;
+  varying vec2 vLocal;
   varying vec2 vWorld;
   void main() {
-    vUv = uv;
+    vLocal = position.xy * uHalf; // ship-frame coordinates (the mesh is rotated with the bank)
     vec4 w = modelMatrix * vec4(position, 1.0);
     vWorld = w.xy;
     gl_Position = projectionMatrix * viewMatrix * w;
   }
 `;
 
-// Darkens the wall except inside the gap: the gap test mirrors Obstacle.fits().
+// A soft shadow of the ship's silhouette. The edge softness comes from the signed distance to the
+// silhouette polygon, so one parameter (uSoft) takes it from a wide blur to a crisp outline.
+// Fragments inside the wall's gap are discarded: the gap test mirrors Obstacle.fits().
 const shadowFragment = /* glsl */ `
-  uniform sampler2D uMap;
-  uniform float uUseMap;
-  uniform float uOpacity;
-  uniform float uKind;   // 0 = circular hole, 1 = slot
-  uniform vec3 uHole;    // circle: centre x, y and radius; slot: (unused, offset, half-height)
-  uniform float uAngle;  // the wall's current rotation
-  varying vec2 vUv;
+  #define N ${PROFILE_N}
+  uniform vec2 uPoly[N];
+  uniform float uSoft;     // penumbra half-width in world units
+  uniform float uDark;     // darkness at the umbra
+  uniform float uKind;     // 0 = circular hole, 1 = slot
+  uniform vec3 uHole;      // circle: centre x, y and radius; slot: (unused, offset, half-height)
+  uniform float uAngle;    // the wall's current rotation
+  varying vec2 vLocal;
   varying vec2 vWorld;
+
+  // Signed distance to a polygon (negative inside), after Inigo Quilez.
+  float sdPolygon(vec2 p) {
+    float d = dot(p - uPoly[0], p - uPoly[0]);
+    float s = 1.0;
+    vec2 prev = uPoly[N - 1];
+    for (int i = 0; i < N; i++) {
+      vec2 cur = uPoly[i];
+      vec2 e = prev - cur;
+      vec2 w = p - cur;
+      vec2 b = w - e * clamp(dot(w, e) / dot(e, e), 0.0, 1.0);
+      d = min(d, dot(b, b));
+      bvec3 c = bvec3(p.y >= cur.y, p.y < prev.y, e.x * w.y > e.y * w.x);
+      if (all(c) || all(not(c))) s = -s;
+      prev = cur;
+    }
+    return s * sqrt(d);
+  }
+
   void main() {
-    float c = cos(-uAngle), s = sin(-uAngle);
-    vec2 p = vec2(vWorld.x * c - vWorld.y * s, vWorld.x * s + vWorld.y * c);
-    bool inGap = uKind < 0.5 ? length(p - uHole.xy) < uHole.z : abs(p.y - uHole.y) < uHole.z;
+    float c = cos(-uAngle), sn = sin(-uAngle);
+    vec2 g = vec2(vWorld.x * c - vWorld.y * sn, vWorld.x * sn + vWorld.y * c);
+    bool inGap = uKind < 0.5 ? length(g - uHole.xy) < uHole.z : abs(g.y - uHole.y) < uHole.z;
     if (inGap) discard;
-    float a = uUseMap > 0.5 ? texture2D(uMap, vUv).a : 1.0;
-    gl_FragColor = vec4(0.0, 0.0, 0.0, a * uOpacity);
+    float d = sdPolygon(vLocal);
+    // The blur spreads outward from the silhouette, so the core stays dark even when the edge is wide
+    // (the ship is thin from behind: a blur centred on the edge would wash the whole shadow out).
+    float a = 1.0 - smoothstep(0.0, uSoft * 2.0, d);
+    gl_FragColor = vec4(0.0, 0.0, 0.0, a * uDark);
   }
 `;
 
@@ -165,52 +180,41 @@ const shadowFragment = /* glsl */ `
  * dark, with no UI colour, and it is clipped by the gap like a real shadow: on the wall while the ship is
  * lined up with the wall, gone while it is lined up with the gap, and cut by the gap's edge when it
  * overlaps the rim. As the ship closes in, its position and its shadow converge on the impact point.
- * A soft blob around the true-size silhouette acts as a penumbra: it grows softer and lighter with
- * distance, as a real soft shadow does, which keeps the spot findable from far away.
+ *
+ * Like a real penumbra, its softness depends on how far the ship is from the wall: far away it is a
+ * wide, faint blur; it tightens into a crisp, dark silhouette at the moment of contact.
  */
 export class WallShadow {
   readonly group = new THREE.Group();
-  private blob: THREE.Mesh;
-  private blobUniforms: Record<string, THREE.IUniform>;
-  private fillUniforms: Record<string, THREE.IUniform>;
-  private hole = {
-    uKind: { value: 0 },
-    uHole: { value: new THREE.Vector3() },
-    uAngle: { value: 0 },
-  };
+  private mesh: THREE.Mesh;
+  private uniforms: Record<string, THREE.IUniform>;
 
   constructor() {
-    const make = (map: THREE.Texture | null) => {
-      const uniforms: Record<string, THREE.IUniform> = {
-        ...this.hole, // shared: one update clips both meshes
-        uMap: { value: map },
-        uUseMap: { value: map ? 1 : 0 },
-        uOpacity: { value: 0 },
-      };
-      const mat = new THREE.ShaderMaterial({
-        uniforms,
+    const k = CONFIG.ship.scale;
+    this.uniforms = {
+      uPoly: { value: REAR_PROFILE.map(([x, y]) => new THREE.Vector2(x * k, y * k)) },
+      uHalf: { value: 1 },
+      uSoft: { value: 0.02 },
+      uDark: { value: 0 },
+      uKind: { value: 0 },
+      uHole: { value: new THREE.Vector3() },
+      uAngle: { value: 0 },
+    };
+    this.mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.ShaderMaterial({
+        uniforms: this.uniforms,
         vertexShader: shadowVertex,
         fragmentShader: shadowFragment,
         transparent: true,
         depthWrite: false,
-      });
-      return { mat, uniforms };
-    };
-    const blob = make(blobTexture());
-    this.blobUniforms = blob.uniforms;
-    this.blob = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), blob.mat);
-    const fill = make(null);
-    this.fillUniforms = fill.uniforms;
-    const silhouette = new THREE.Mesh(new THREE.ShapeGeometry(rearProfile()), fill.mat);
-    this.silhouette = silhouette;
+      }),
+    );
     // Draw after the (transparent) walls so the shadow lies on their face.
-    this.blob.renderOrder = 2;
-    silhouette.renderOrder = 2;
-    this.group.add(this.blob, silhouette);
+    this.mesh.renderOrder = 2;
+    this.group.add(this.mesh);
     this.group.visible = false;
   }
-
-  private silhouette: THREE.Mesh;
 
   hide(): void {
     this.group.visible = false;
@@ -220,7 +224,7 @@ export class WallShadow {
     // Distance straight down the tunnel to the wall's face, and the fade-in from it.
     const faceZ = p.point.z;
     const dist = shipPos.z - faceZ;
-    const { fadeStart, fadeFull } = CONFIG.aids;
+    const { fadeStart, fadeFull, shadowSoftness, shadowMinSoft } = CONFIG.aids;
     const tta = dist / Math.max(1, speed);
     const strength = THREE.MathUtils.smoothstep(fadeStart - tta, 0, fadeStart - fadeFull);
     if (dist <= 0 || strength <= 0) {
@@ -229,19 +233,23 @@ export class WallShadow {
     }
     const o = p.obstacle;
     this.group.visible = true;
-    // Perpendicular projection: the ship's own x/y, on the wall's face.
+    // Perpendicular projection: the ship's own x/y, on the wall's face, turned with the ship's bank.
     this.group.position.set(shipPos.x, shipPos.y, faceZ + 0.05);
-    this.silhouette.rotation.z = bank;
+    this.mesh.rotation.z = bank;
     // Clip against the gap as it looks now (the bevel makes the visible hole slightly smaller).
-    this.hole.uKind.value = o.kind === 'circle' ? 0 : 1;
-    this.hole.uHole.value.set(o.cx, o.cy, o.r - BEVEL);
-    this.hole.uAngle.value = o.angle;
-    // Penumbra: about the wingspan up close, wider with distance. Full darkness so it reads against
-    // the high-contrast hazard stripes.
-    const half = 0.62 * CONFIG.ship.scale + dist * 0.05;
-    this.blob.scale.setScalar(half);
-    this.blobUniforms.uOpacity.value = strength;
-    this.fillUniforms.uOpacity.value = strength;
+    this.uniforms.uKind.value = o.kind === 'circle' ? 0 : 1;
+    (this.uniforms.uHole.value as THREE.Vector3).set(o.cx, o.cy, o.r - BEVEL);
+    this.uniforms.uAngle.value = o.angle;
+    // Penumbra: the edge blur grows with the ship's distance from the wall, like a real soft shadow.
+    // A blurrier shadow spreads the same darkness over more area, so its core is lighter.
+    const soft = shadowMinSoft + dist * shadowSoftness;
+    this.uniforms.uSoft.value = soft;
+    const halfWing = 0.8 * CONFIG.ship.scale;
+    this.uniforms.uDark.value = strength * THREE.MathUtils.clamp(halfWing / (halfWing + soft * 0.5), 0.65, 1);
+    // The quad must cover the silhouette plus the blur on every side.
+    const half = halfWing + soft * 2.1;
+    this.uniforms.uHalf.value = half;
+    this.mesh.scale.setScalar(half);
   }
 }
 

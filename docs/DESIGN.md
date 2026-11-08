@@ -123,8 +123,11 @@ The camera is about 6 units behind the ship, so a wall the ship has just passed 
    - It's plain dark, with no UI colour.
    - **It's clipped by the gap, like a real shadow.** A shader discards the shadow wherever the wall has a hole, using the same gap shape as the collision test. So the shadow is on the wall while the ship is lined up with solid wall and gone while it's lined up with the gap. **When the ship overlaps the rim, the shadow is cut by the hole's edge**, so near-misses read without any UI.
    - Its fade-in uses the straight-line distance down the tunnel to the wall, not the predicted path.
-   - A soft **penumbra** blob around the true-size silhouette grows with distance (wingspan plus 5% of the distance), as a real soft shadow does. That keeps the spot findable from about a second out, with no markers.
-   - It's drawn at full darkness. Lighter versions disappeared against the half-black hazard stripes.
+   - **Fuzzy to sharp:** like a real penumbra, the shadow's softness depends on how far the ship is from the wall. Far away it's a wide, faint smudge; it tightens into a crisp, dark ship silhouette at the moment of contact. The designer asked for this so the shadow fades in naturally rather than as a fixed decal.
+     - The softness comes from the signed distance to the ship's rear silhouette (a 7-point polygon) computed in the fragment shader. One parameter, the blur width, takes it from smudge to outline: `shadowMinSoft` + distance × `shadowSoftness`.
+     - The blur spreads **outward** from a fully dark core. From behind the ship is only about 0.2 units tall, so a blur centred on the edge washed the whole shadow out to about 30% darkness and it vanished.
+     - A wider shadow is lighter overall (the same darkness spread over more area), but never below 65%. Lighter versions disappeared against the half-black hazard stripes.
+   - **Known limit:** cast straight down the tunnel and seen from a camera directly behind the ship, the shadow sits close to the line of sight, so up close the ship partly hides its own shadow. The camera sits slightly above the ship, which keeps most of it visible.
    - Works with the ship-light dimming described under Lighting.
 2. **Rim warning (in world):** the gap's glowing rim pulses red when you're on course to hit that wall. It's part of the world, since the rim already glows.
 3. **Target markers (interface, off by default):**
