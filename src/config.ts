@@ -37,6 +37,11 @@ export const CONFIG = {
     minHole: 2.4,
     holePerRing: 0.09,
     thickness: 1.6,
+    /**
+     * Distance the ship travels past a wall while it fades out. Keep it below the camera
+     * distance so the wall is gone before the camera reaches it.
+     */
+    fadeDistance: 3.4,
     /** How many rings exist at once (pooled). */
     poolSize: 7,
   },

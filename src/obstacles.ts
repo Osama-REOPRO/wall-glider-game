@@ -21,7 +21,13 @@ export class Obstacle {
   flash = 0;
   readonly baseColor = new THREE.Color();
 
+  /** Own copy of the face material, so each wall can fade on its own. */
+  private capMaterial: THREE.MeshStandardMaterial;
+  /** 1 = solid, 0 = gone. */
+  private opacity = 1;
+
   constructor(capMaterial: THREE.MeshStandardMaterial) {
+    this.capMaterial = capMaterial.clone();
     this.rimMaterial = new THREE.MeshStandardMaterial({
       color: 0x111111,
       metalness: 0.1,
@@ -29,7 +35,9 @@ export class Obstacle {
       emissive: 0xffffff,
       emissiveIntensity: 2.2,
     });
-    this.mesh = new THREE.Mesh(new THREE.BufferGeometry(), [capMaterial, this.rimMaterial]);
+    // Both materials are always in the transparent pass so fading never needs a shader rebuild.
+    for (const m of [this.capMaterial, this.rimMaterial]) m.transparent = true;
+    this.mesh = new THREE.Mesh(new THREE.BufferGeometry(), [this.capMaterial, this.rimMaterial]);
   }
 
   /** Rebuild the geometry for a new hole. Called only when the obstacle is recycled, never per frame. */
@@ -42,6 +50,7 @@ export class Obstacle {
     this.spin = spin;
     this.passed = false;
     this.flash = 0;
+    this.setOpacity(1);
 
     const R = CONFIG.tube.radius + 0.35; // sinks slightly into the wall
     const shapes: THREE.Shape[] = [];
@@ -85,7 +94,31 @@ export class Obstacle {
     this.mesh.rotation.z = angle;
   }
 
-  update(dt: number): void {
+  /**
+   * Fade the wall out once the ship is fully through its gap, so it never blocks the camera's
+   * view of the next wall. Nothing fades before the ship has cleared the wall's back face.
+   */
+  private fadeFor(shipZ: number): void {
+    const C = CONFIG.obstacles;
+    const cleared = this.z - C.thickness / 2 - 0.08 - CONFIG.ship.radius; // back face + bevel + ship
+    const t = shipZ < cleared ? (cleared - shipZ) / C.fadeDistance : 0;
+    this.setOpacity(1 - Math.min(1, t));
+  }
+
+  private setOpacity(a: number): void {
+    if (a === this.opacity) return;
+    this.opacity = a;
+    this.capMaterial.opacity = a;
+    this.rimMaterial.opacity = a;
+    // A fading wall must not hide what's behind it in the depth buffer.
+    const solid = a >= 1;
+    this.capMaterial.depthWrite = solid;
+    this.rimMaterial.depthWrite = solid;
+    this.mesh.visible = a > 0;
+  }
+
+  update(dt: number, shipZ: number): void {
+    this.fadeFor(shipZ);
     if (this.spin !== 0) {
       this.angle += this.spin * dt;
       this.mesh.rotation.z = this.angle;
@@ -233,7 +266,7 @@ export class Obstacles {
     let next: Obstacle | null = null;
     for (const o of this.items) {
       if (o.z > shipZ + 20) this.respawn(o);
-      o.update(dt);
+      o.update(dt, shipZ);
       if (o.z < shipZ && (next === null || o.z > next.z)) next = o;
     }
     if (next) {
