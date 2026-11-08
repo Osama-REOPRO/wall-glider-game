@@ -52,6 +52,8 @@ export class SteerInput {
     target.addEventListener('pointercancel', end);
     // Keyboard fallback for desktop testing.
     window.addEventListener('keydown', (e) => {
+      // Keys aimed at a focused button or checkbox belong to it, not to the game.
+      if (e.target instanceof HTMLElement && e.target.closest('button, input, label')) return;
       if (e.code === 'Space' || e.code === 'Enter') this.onPress?.();
       if (!this.enabled) return;
       const step = 0.06;

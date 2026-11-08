@@ -19,6 +19,9 @@ export class Obstacle {
   passed = false;
   /** Rim flash after the ship passes (0..1). */
   flash = 0;
+  /** Collision warning strength set by the flight aids each frame (0..1). */
+  warn = 0;
+  private time = 0;
   readonly baseColor = new THREE.Color();
 
   /** Own copy of the face material, so each wall can fade on its own. */
@@ -50,6 +53,7 @@ export class Obstacle {
     this.spin = spin;
     this.passed = false;
     this.flash = 0;
+    this.warn = 0;
     this.setOpacity(1);
 
     const R = CONFIG.tube.radius + 0.35; // sinks slightly into the wall
@@ -125,20 +129,26 @@ export class Obstacle {
     }
     this.mesh.position.z = this.z;
     if (this.flash > 0) this.flash = Math.max(0, this.flash - dt * 2.5);
-    this.rimMaterial.emissive.copy(this.baseColor).lerp(WHITE, this.flash);
-    this.rimMaterial.emissiveIntensity = 2.2 + this.flash * 4;
+    this.time += dt;
+    // Warning: pulse the rim toward red. The pass flash (white) still wins when it fires.
+    const pulse = this.warn > 0 ? this.warn * (0.65 + 0.35 * Math.sin(this.time * 20)) : 0;
+    this.rimMaterial.emissive.copy(this.baseColor).lerp(WARN_RED, pulse).lerp(WHITE, this.flash);
+    this.rimMaterial.emissiveIntensity = 2.2 + pulse * 2.5 + this.flash * 4;
   }
 
-  /** Transform a world (x, y) into this obstacle's local frame. */
-  toLocal(x: number, y: number, out: THREE.Vector2): THREE.Vector2 {
-    const c = Math.cos(-this.angle);
-    const s = Math.sin(-this.angle);
+  /** Transform a world (x, y) into this obstacle's local frame (optionally at another rotation). */
+  toLocal(x: number, y: number, out: THREE.Vector2, angle = this.angle): THREE.Vector2 {
+    const c = Math.cos(-angle);
+    const s = Math.sin(-angle);
     return out.set(x * c - y * s, x * s + y * c);
   }
 
-  /** True if a sphere of radius `margin` at world (x, y) fits through the gap. */
-  fits(x: number, y: number, margin: number): boolean {
-    const p = this.toLocal(x, y, tmp2);
+  /**
+   * True if a sphere of radius `margin` at world (x, y) fits through the gap.
+   * `angle` lets the flight aids test a spinning slot at the rotation it will have on arrival.
+   */
+  fits(x: number, y: number, margin: number, angle = this.angle): boolean {
+    const p = this.toLocal(x, y, tmp2, angle);
     if (this.kind === 'circle') return Math.hypot(p.x - this.cx, p.y - this.cy) <= this.r - margin;
     return Math.abs(p.y - this.cy) <= this.r - margin;
   }
@@ -173,6 +183,7 @@ export class Obstacle {
 }
 
 const WHITE = new THREE.Color(1, 1, 1);
+const WARN_RED = new THREE.Color(1, 0.04, 0.02);
 const tmp2 = new THREE.Vector2();
 const tmpGap = new THREE.Vector2();
 

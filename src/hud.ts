@@ -1,7 +1,18 @@
 import type { Quality } from './renderer';
+import { DEFAULT_AIDS, type AidSettings } from './aids';
 
 const BEST_KEY = 'wall-glider.best';
 const QUALITY_KEY = 'wall-glider.quality';
+const AIDS_KEY = 'wall-glider.aids';
+
+function readAids(): AidSettings {
+  try {
+    const saved = JSON.parse(readStorage(AIDS_KEY) ?? 'null') as Partial<AidSettings> | null;
+    return { ...DEFAULT_AIDS, ...(saved ?? {}) };
+  } catch {
+    return { ...DEFAULT_AIDS };
+  }
+}
 
 function readStorage(key: string): string | null {
   try {
@@ -32,6 +43,11 @@ export class Hud {
   private qualityBtn = document.getElementById('quality') as HTMLButtonElement;
   best = Number(readStorage(BEST_KEY) ?? 0) || 0;
 
+  /** Current flight-aid toggles (saved per browser). */
+  readonly aids: AidSettings = readAids();
+  private aidsBtn = document.getElementById('aids') as HTMLButtonElement;
+  private aidsPanel = document.getElementById('aids-panel')!;
+
   onQualityChange: ((q: Quality) => void) | null = null;
   onTunnel: (() => void) | null = null;
   onFree: (() => void) | null = null;
@@ -54,7 +70,29 @@ export class Hud {
     button(document.getElementById('mode-tunnel')!, () => this.onTunnel?.());
     button(document.getElementById('mode-free')!, () => this.onFree?.());
     button(this.exitBtn, () => this.onExit?.());
+
+    // Aids panel: the button opens/closes it; each checkbox toggles one aid.
+    button(this.aidsBtn, () => this.setAidsPanel(this.aidsPanel.hidden !== false));
+    this.aidsPanel.addEventListener('pointerdown', (e) => e.stopPropagation());
+    const boxes: [keyof AidSettings, string][] = [
+      ['shadow', 'aid-shadow'],
+      ['rim', 'aid-rim'],
+      ['forgiving', 'aid-forgiving'],
+    ];
+    for (const [key, id] of boxes) {
+      const box = document.getElementById(id) as HTMLInputElement;
+      box.checked = this.aids[key];
+      box.addEventListener('change', () => {
+        this.aids[key] = box.checked;
+        writeStorage(AIDS_KEY, JSON.stringify(this.aids));
+      });
+    }
     this.renderBest();
+  }
+
+  setAidsPanel(open: boolean): void {
+    this.aidsPanel.hidden = !open;
+    this.aidsBtn.setAttribute('aria-expanded', String(open));
   }
 
   savedQuality(): Quality {

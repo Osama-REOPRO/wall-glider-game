@@ -54,6 +54,15 @@ export const CONFIG = {
     /** How far ahead of the ship the camera aims. */
     lookAhead: 32,
   },
+  /** Flight aids: cues that make depth readable from the chase camera. Each can be toggled in the Aids panel. */
+  aids: {
+    /** Collision radius multiplier when the forgiving hitbox is on. */
+    forgivingScale: 0.8,
+    /** Cues start fading in this many seconds before reaching the wall... */
+    fadeStart: 2.0,
+    /** ...and are at full strength from this many seconds out. */
+    fadeFull: 0.6,
+  },
   /** Free-flight mode: open space, no tube, no obstacles. */
   space: {
     speed: 30,

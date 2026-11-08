@@ -16,7 +16,16 @@
       <div id="best"></div>
       <div id="readout" hidden></div>
       <button id="exit" type="button" hidden>&larr; Menu</button>
-      <button id="quality" type="button" aria-label="Toggle graphics quality">HI</button>
+      <div id="corner">
+        <button id="aids" type="button" aria-expanded="false" aria-controls="aids-panel">Aids</button>
+        <button id="quality" type="button" aria-label="Toggle graphics quality">HI</button>
+      </div>
+      <div id="aids-panel" hidden>
+        <p class="panel-title">Flight aids</p>
+        <label><input type="checkbox" id="aid-shadow" /> <span>Shadow on next wall</span></label>
+        <label><input type="checkbox" id="aid-rim" /> <span>Rim warning</span></label>
+        <label><input type="checkbox" id="aid-forgiving" /> <span>Forgiving hitbox</span></label>
+      </div>
     </div>
     <div id="overlay" class="visible">
       <h1>WALL GLIDER</h1>

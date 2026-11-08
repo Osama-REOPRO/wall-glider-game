@@ -61,11 +61,52 @@ html, body {
   color: var(--muted);
 }
 
-#quality {
+#corner {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 14px);
+  right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex;
+  gap: 8px;
+}
+
+#aids-panel {
   pointer-events: auto;
   position: absolute;
-  top: calc(env(safe-area-inset-top) + 14px);
+  top: calc(env(safe-area-inset-top, 0px) + 54px);
   right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex;
+  flex-direction: column;
+  padding: 10px 14px 6px;
+  border-radius: 14px;
+  border: 1px solid rgba(95, 243, 255, 0.35);
+  background: rgba(5, 6, 13, 0.82);
+  text-align: left;
+}
+#aids-panel .panel-title {
+  margin: 0 0 4px;
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+#aids-panel label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  font-size: 14px;
+  color: var(--fg);
+}
+#aids-panel input {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+#aids,
+#quality {
+  pointer-events: auto;
   min-width: 44px;
   height: 32px;
   padding: 0 10px;
@@ -149,8 +190,8 @@ html, body {
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
-#modes button:active, #exit:active, #quality:active { background: rgba(95, 243, 255, 0.2); }
-#modes button:focus-visible, #exit:focus-visible, #quality:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+#modes button:active, #exit:active, #quality:active, #aids:active, #aids[aria-expanded="true"] { background: rgba(95, 243, 255, 0.2); }
+#modes button:focus-visible, #exit:focus-visible, #quality:focus-visible, #aids:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 [hidden] { display: none !important; }
 /* The overlay fades out instead of disappearing, so its buttons must stop taking taps while hidden. */
 #overlay:not(.visible) #modes button { pointer-events: none; }

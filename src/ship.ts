@@ -104,6 +104,11 @@ export class Ship {
     this.group.add(this.light);
   }
 
+  /** Current visual bank angle (radians). */
+  get bank(): number {
+    return this.roll;
+  }
+
   reset(): void {
     this.position.set(0, 0, 0);
     this.prevPosition.copy(this.position);

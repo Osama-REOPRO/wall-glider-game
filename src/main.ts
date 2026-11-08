@@ -11,6 +11,7 @@ import { Particles, Dust } from './particles';
 import { checkCollision } from './collision';
 import { Hud } from './hud';
 import { Space } from './space';
+import { ProjectedShadow, predict, hitRadius, type Prediction } from './aids';
 
 type State = 'title' | 'playing' | 'dead';
 /** 'tunnel' is the game. 'free' is open space with no obstacles, for testing the controls. */
@@ -42,6 +43,8 @@ const dust = new Dust();
 // Short-lived light for explosions.
 const blastLight = new THREE.PointLight(0xff9a40, 0, 80, 1.3);
 scene.add(tube.mesh, ship.group, obstacles.group, particles.points, dust.points, blastLight);
+const shadow = new ProjectedShadow();
+scene.add(shadow.group);
 const space = new Space();
 space.group.visible = false;
 scene.add(space.group);
@@ -68,6 +71,7 @@ applyViewport();
 let state: State = 'title';
 let mode: Mode = 'tunnel';
 let readoutTimer = 0;
+let prediction: Prediction | null = null;
 let score = 0;
 let deadTime = 0;
 let timeScale = 1;
@@ -111,6 +115,7 @@ function resetWorld(): void {
   hud.setScore(0);
   timeScale = 1;
   blastLight.intensity = 0;
+  clearAids();
   // Snap the camera behind the ship so a mode change doesn't swoop across the world.
   camPos.set(0, CONFIG.camera.height, CONFIG.camera.distance);
   camLook.set(0, 0, -CONFIG.camera.lookAhead);
@@ -230,6 +235,30 @@ function passBurst(o: (typeof obstacles.items)[number]): void {
   }
 }
 
+/**
+ * Flight aids: predict where the ship crosses the next wall at the heading it's steering to,
+ * then drive the projected shadow and the rim warning from that one prediction.
+ */
+function updateAids(yaw: number, pitch: number): void {
+  const radius = hitRadius(hud.aids);
+  prediction = predict(ship.position, yaw, pitch, ship.speed, obstacles, radius);
+  for (const o of obstacles.items) o.warn = 0;
+  if (!prediction) {
+    shadow.hide();
+    return;
+  }
+  if (hud.aids.rim && prediction.outcome === 'wall') prediction.obstacle.warn = prediction.strength;
+  shadow.speedHint = ship.speed;
+  if (hud.aids.shadow) shadow.show(prediction, ship.bank, radius);
+  else shadow.hide();
+}
+
+function clearAids(): void {
+  prediction = null;
+  shadow.hide();
+  for (const o of obstacles.items) o.warn = 0;
+}
+
 /** Attract mode: steer toward the next gap so the title screen shows the game being played. */
 function autopilot(): [number, number] {
   const next = obstacles.nextAhead(ship.position.z);
@@ -332,10 +361,12 @@ function frame(now: number): void {
     const [yaw, pitch] = autopilot();
     ship.speed = CONFIG.ship.startSpeed * 0.8;
     ship.update(dt, yaw, pitch); // attract mode: no collisions
+    updateAids(yaw, pitch);
   } else if (state === 'playing') {
     ship.speed = Math.min(CONFIG.ship.maxSpeed, CONFIG.ship.startSpeed + score * CONFIG.ship.speedPerRing);
     ship.update(dt, input.yaw, input.pitch);
-    const hit = checkCollision(ship.prevPosition, ship.position, obstacles.items);
+    updateAids(input.yaw, input.pitch);
+    const hit = checkCollision(ship.prevPosition, ship.position, obstacles.items, hitRadius(hud.aids));
     if (hit.type === 'wall' || hit.type === 'obstacle') {
       crash(hit.point);
     } else if (hit.type === 'passed') {
@@ -346,6 +377,7 @@ function frame(now: number): void {
     }
   }
 
+  if (state === 'dead' || mode === 'free') clearAids();
   if (state !== 'dead') emitTrail(dt);
 
   if (mode === 'tunnel') {
@@ -381,6 +413,20 @@ requestAnimationFrame(frame);
   get mode() {
     return mode;
   },
+  get prediction() {
+    return (
+      prediction && {
+        outcome: prediction.outcome,
+        tti: prediction.timeToImpact,
+        strength: prediction.strength,
+        x: prediction.point.x,
+        y: prediction.point.y,
+        z: prediction.obstacle.z,
+      }
+    );
+  },
+  aids: hud.aids,
+  shadow,
   ship,
   input,
   obstacles,

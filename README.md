@@ -4,6 +4,10 @@ A 3D mobile prototype. A triangular ship flies on its own down an endless tube, 
 
 **Free flight** (the menu button, or a link ending in `#free`) is an open-space sandbox for testing the controls. There's no tunnel and no obstacles, turning is unlimited (pitch stops short of straight up and down), and a readout shows heading, pitch and speed.
 
+**Flight aids** (the Aids button, top right) help you judge depth from behind the ship: a shadow showing where you'll cross the next wall, a rim that pulses red when you're about to hit, and a forgiving hitbox. Each can be switched on and off.
+
+Design decisions and the reasoning behind them are in [`docs/DESIGN.md`](docs/DESIGN.md).
+
 Built with **Three.js + TypeScript + Vite**. It runs in any mobile browser, and all textures are generated procedurally, so there are no asset files.
 
 ## Run
@@ -38,5 +42,6 @@ Desktop testing: drag with the mouse, or use the arrow keys / WASD. Space starts
 | `src/collision.ts` | Analytic collision that doesn't tunnel: radius check against the tube, slab-crossing test against each gap. |
 | `src/particles.ts` | Additive GPU point sprites in a ring buffer (trail, contrails, pass bursts, explosion) and the speed dust. |
 | `src/space.ts` | Free-flight scene: nebula sky shader, starfield, distant planet and sun, and a dust cloud that wraps around the ship on the GPU. |
+| `src/aids.ts` | Flight aids: predicts where the ship will cross the next wall (same test as the collision check), and draws the projected shadow. |
 | `src/textures.ts` | Canvas-generated hull panels, normal maps (Sobel from height), emissive light strips, hazard stripes. |
-| `src/hud.ts` | Score, best score (localStorage), title and game-over overlay, HI/LO quality toggle. |
+| `src/hud.ts` | Score, best score (localStorage), title and game-over overlay, mode buttons, Aids panel, HI/LO quality toggle. |

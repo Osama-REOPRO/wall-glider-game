@@ -9,6 +9,8 @@ export type Hit =
   | { type: 'passed'; obstacle: Obstacle };
 
 const hitPoint = new THREE.Vector3();
+/** Extra clearance for the walls' bevelled edges. Shared with the flight aids' prediction. */
+export const BEVEL = 0.08;
 
 /**
  * Analytic collision. The ship is a sphere. The tube is a cylinder, so the wall test is a radius check.
@@ -16,8 +18,12 @@ const hitPoint = new THREE.Vector3();
  * we test the ship's position where it crosses the slab's mid-plane against the gap shape.
  * That makes the test immune to tunnelling at high speed.
  */
-export function checkCollision(prev: THREE.Vector3, curr: THREE.Vector3, obstacles: readonly Obstacle[]): Hit {
-  const shipR = CONFIG.ship.radius;
+export function checkCollision(
+  prev: THREE.Vector3,
+  curr: THREE.Vector3,
+  obstacles: readonly Obstacle[],
+  shipR: number = CONFIG.ship.radius,
+): Hit {
   const R = CONFIG.tube.radius;
 
   const radial = Math.hypot(curr.x, curr.y);
@@ -38,7 +44,7 @@ export function checkCollision(prev: THREE.Vector3, curr: THREE.Vector3, obstacl
     const t = Math.abs(dz) > 1e-6 ? THREE.MathUtils.clamp((o.z - prev.z) / dz, 0, 1) : 1;
     const x = prev.x + (curr.x - prev.x) * t;
     const y = prev.y + (curr.y - prev.y) * t;
-    if (!o.fits(x, y, shipR + 0.08)) {
+    if (!o.fits(x, y, shipR + BEVEL)) {
       hitPoint.set(x, y, o.z + CONFIG.obstacles.thickness / 2);
       return { type: 'obstacle', point: hitPoint, obstacle: o };
     }
