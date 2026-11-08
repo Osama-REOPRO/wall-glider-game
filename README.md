@@ -2,6 +2,8 @@
 
 A 3D mobile prototype. A triangular ship flies on its own down an endless tube, and you only control its heading: drag a finger to turn the nose and the ship flies that way. Fly through the gaps in the walls without touching anything.
 
+**Boost:** double-tap to fly much faster for one wall's spacing, with much less steering, so line up first. Shift or B on desktop.
+
 **Free flight** (the menu button, or a link ending in `#free`) is an open-space sandbox for testing the controls. There's no tunnel and no obstacles, turning is unlimited (pitch stops short of straight up and down), and a readout shows heading, pitch and speed.
 
 **Flight aids** (the Aids button, top right) help you judge depth from behind the ship, and each can be switched on and off. In the world: the ship's shadow on the next wall (fuzzy far away, sharp at contact, clipped by the gap) and a rim that pulses red when you're about to hit, plus optional electric arcs, a headlight, a wall heat glow and bow-wave dust to compare. A forgiving hitbox is on by default. Interface target markers exist for comparison but are off by default, because cues should live in the world rather than in the UI.
@@ -44,5 +46,6 @@ Desktop testing: drag with the mouse, or use the arrow keys / WASD. Space starts
 | `src/space.ts` | Free-flight scene: nebula sky shader, starfield, distant planet and sun, and a dust cloud that wraps around the ship on the GPU. |
 | `src/aids.ts` | Flight aids: predicts where the ship will cross the next wall (same test as the collision check), and draws the projected shadow. |
 | `src/worldcues.ts` | Optional in-world cues: electric arcs to the nearest surface, headlight, wall heat glow, bow-wave dust. |
+| `src/boost.ts` | Speed-line streaks shown while boosting. (Boost timing, speed and steering live in `main.ts`; double-tap detection in `input.ts`.) |
 | `src/textures.ts` | Canvas-generated hull panels, normal maps (Sobel from height), emissive light strips, hazard stripes. |
 | `src/hud.ts` | Score, best score (localStorage), title and game-over overlay, mode buttons, Aids panel, HI/LO quality toggle. |

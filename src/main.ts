@@ -13,6 +13,7 @@ import { Hud } from './hud';
 import { Space } from './space';
 import { WallShadow, TargetMarker, predict, hitRadius, type Prediction } from './aids';
 import { WorldCues } from './worldcues';
+import { SpeedLines } from './boost';
 
 type State = 'title' | 'playing' | 'dead';
 /** 'tunnel' is the game. 'free' is open space with no obstacles, for testing the controls. */
@@ -48,6 +49,8 @@ const shadow = new WallShadow();
 const marker = new TargetMarker();
 scene.add(shadow.group, marker.group);
 const cues = new WorldCues(scene, particles);
+const speedLines = new SpeedLines();
+scene.add(speedLines.mesh);
 const space = new Space();
 space.group.visible = false;
 scene.add(space.group);
@@ -75,6 +78,12 @@ let state: State = 'title';
 let mode: Mode = 'tunnel';
 let readoutTimer = 0;
 let prediction: Prediction | null = null;
+// Boost: distance left to travel at full boost, the smoothed 0..1 boost level, and time since the run began.
+let boostLeft = 0;
+let boostLevel = 0;
+let runTime = 0;
+/** Speed before the boost multiplier (drives the normal speed-based camera widening). */
+let baseSpeed: number = CONFIG.ship.startSpeed;
 /** Debug: freezes the simulation while rendering continues (used by automated screenshots). */
 let paused = false;
 let score = 0;
@@ -96,6 +105,8 @@ const COLORS = {
   trailHot: new THREE.Color(0.45, 0.85, 1.5),
   trailCool: new THREE.Color(0.35, 0.08, 0.9),
   contrail: new THREE.Color(0.5, 0.8, 1.2),
+  boostHot: new THREE.Color(1.3, 1.2, 1.6),
+  boostCool: new THREE.Color(0.9, 0.2, 0.9),
   fire: new THREE.Color(4.0, 2.6, 1.0),
   ember: new THREE.Color(1.2, 0.15, 0.05),
   spark: new THREE.Color(3.0, 3.0, 3.0),
@@ -119,6 +130,12 @@ function resetWorld(): void {
   setZone(0);
   hud.setScore(0);
   timeScale = 1;
+  boostLeft = 0;
+  boostLevel = 0;
+  runTime = 0;
+  input.steerScale = 1;
+  ship.boost = 0;
+  speedLines.clear();
   blastLight.intensity = 0;
   clearAids();
   // Snap the camera behind the ship so a mode change doesn't swoop across the world.
@@ -188,6 +205,42 @@ function crash(point: THREE.Vector3): void {
   }
 }
 
+/**
+ * Double tap: boost for one wall's spacing (the distance from the next wall to the one after it).
+ * Ignored if already boosting, or right after a run starts (the start tap shouldn't count).
+ */
+function tryBoost(): void {
+  if (state !== 'playing' || boostLeft > 0 || runTime < 0.4) return;
+  boostLeft = mode === 'tunnel' ? obstacles.spacingAhead(ship.position.z) : CONFIG.boost.freeFlightDistance;
+  // Ignition: a white-hot burst from the engines, a kick of camera shake, a buzz.
+  const tail = ship.tailPosition(tmpA);
+  tmpB.copy(ship.direction).multiplyScalar(-ship.speed * 0.3);
+  particles.burst(tail, 70, 12, { life: 0.45, size: 0.18, endSize: 0, color: COLORS.boostHot, endColor: COLORS.boostCool, drag: 3 }, tmpB);
+  shake = Math.max(shake, 0.35);
+  try {
+    navigator.vibrate?.(25);
+  } catch {
+    /* vibration not allowed */
+  }
+}
+
+/** Ease the boost level in and out, and apply it to speed, steering and the engine. */
+function updateBoost(dt: number): void {
+  const B = CONFIG.boost;
+  if (boostLeft > 0) {
+    boostLeft = Math.max(0, boostLeft - ship.speed * dt);
+    boostLevel = Math.min(1, boostLevel + dt / B.rampUp);
+  } else {
+    boostLevel = Math.max(0, boostLevel - dt / B.rampDown);
+  }
+  const eased = boostLevel * boostLevel * (3 - 2 * boostLevel);
+  ship.speed = baseSpeed * (1 + (B.speedMultiplier - 1) * eased);
+  input.steerScale = 1 + (B.steerScale - 1) * eased;
+  ship.boost = eased;
+}
+
+input.onDoubleTap = tryBoost;
+
 input.onPress = () => {
   if (mode === 'free') return;
   if (state === 'title') startGame();
@@ -196,7 +249,7 @@ input.onPress = () => {
 
 // --- Effects -----------------------------------------------------------------
 function emitTrail(dt: number): void {
-  trailAccumulator += CONFIG.particles.trailRate * dt;
+  trailAccumulator += CONFIG.particles.trailRate * (1 + ship.boost) * dt;
   const n = Math.floor(trailAccumulator);
   trailAccumulator -= n;
   if (n <= 0) return;
@@ -213,7 +266,7 @@ function emitTrail(dt: number): void {
       back.x + (Math.random() - 0.5) * 0.9,
       back.y + (Math.random() - 0.5) * 0.9,
       back.z + (Math.random() - 0.5) * 0.9,
-      TRAIL,
+      ship.boost > 0.3 ? BOOST_TRAIL : TRAIL,
     );
   }
   // Thin contrails from the wing tips.
@@ -223,6 +276,8 @@ function emitTrail(dt: number): void {
   }
 }
 const TRAIL = { life: 0.5, size: 0.1, endSize: 0.26, color: COLORS.trailHot, endColor: COLORS.trailCool, drag: 1.5 };
+/** Nitro flame: hotter, fatter and longer-lived than the normal trail. */
+const BOOST_TRAIL = { life: 0.55, size: 0.16, endSize: 0.3, color: COLORS.boostHot, endColor: COLORS.boostCool, drag: 1.2 };
 const CONTRAIL = { life: 0.4, size: 0.055, endSize: 0.012, color: COLORS.contrail, endColor: COLORS.trailCool };
 
 function passBurst(o: (typeof obstacles.items)[number]): void {
@@ -281,7 +336,7 @@ function autopilot(): [number, number] {
 }
 
 /** Free flight: a plain chase camera behind and above the ship's heading. */
-function updateFreeCamera(dt: number): void {
+function updateFreeCamera(dt: number, realDt: number): void {
   const C = CONFIG.camera;
   const p = ship.position;
   tmpA.copy(p).addScaledVector(ship.direction, -C.distance);
@@ -290,7 +345,16 @@ function updateFreeCamera(dt: number): void {
   camPos.lerp(tmpA, 1 - Math.exp(-9 * dt));
   camLook.lerp(tmpB, 1 - Math.exp(-12 * dt));
   camera.position.copy(camPos);
+  applyShake(realDt);
   camera.lookAt(camLook);
+}
+
+function applyShake(realDt: number): void {
+  if (shake <= 0) return;
+  const s = shake * shake * 0.6;
+  camera.position.x += (Math.random() - 0.5) * s;
+  camera.position.y += (Math.random() - 0.5) * s;
+  shake = Math.max(0, shake - realDt * 1.6);
 }
 
 function updateReadout(dt: number): void {
@@ -304,7 +368,7 @@ function updateReadout(dt: number): void {
 
 function updateCamera(dt: number, realDt: number): void {
   if (mode === 'free') {
-    updateFreeCamera(dt);
+    updateFreeCamera(dt, realDt);
     return;
   }
   const C = CONFIG.camera;
@@ -325,21 +389,19 @@ function updateCamera(dt: number, realDt: number): void {
   camPos.lerp(tmpA, k);
   camLook.lerp(tmpB, 1 - Math.exp(-12 * dt));
   camera.position.copy(camPos);
-  if (shake > 0) {
-    const s = shake * shake * 0.6;
-    camera.position.x += (Math.random() - 0.5) * s;
-    camera.position.y += (Math.random() - 0.5) * s;
-    shake = Math.max(0, shake - realDt * 1.6);
-  }
+  applyShake(realDt);
   camera.lookAt(camLook);
   // Roll the camera slightly with the ship's turn for extra motion feel.
   camera.rotateZ(-ship.yaw * 0.25);
 
-  // Widen the field of view with speed.
-  const speedT = (ship.speed - CONFIG.ship.startSpeed) / (CONFIG.ship.maxSpeed - CONFIG.ship.startSpeed);
-  const fov = C.fov + speedT * 12;
+}
+
+/** Widen the field of view with speed, plus a kick while boosting (faster to open than to close). */
+function updateFov(dt: number): void {
+  const speedT = (baseSpeed - CONFIG.ship.startSpeed) / (CONFIG.ship.maxSpeed - CONFIG.ship.startSpeed);
+  const fov = CONFIG.camera.fov + (mode === 'tunnel' ? THREE.MathUtils.clamp(speedT, 0, 1) * 12 : 0) + ship.boost * CONFIG.boost.fovKick;
   if (Math.abs(camera.fov - fov) > 0.01) {
-    camera.fov += (fov - camera.fov) * (1 - Math.exp(-3 * dt));
+    camera.fov += (fov - camera.fov) * (1 - Math.exp((fov > camera.fov ? -8 : -3) * dt));
     camera.updateProjectionMatrix();
     applyViewport();
   }
@@ -362,8 +424,10 @@ function frame(now: number): void {
   }
   const dt = paused ? 0 : realDt * timeScale;
 
+  if (state === 'playing') runTime += dt;
   if (mode === 'free') {
-    ship.speed = CONFIG.space.speed;
+    baseSpeed = CONFIG.space.speed;
+    updateBoost(dt);
     ship.update(dt, input.yaw, input.pitch); // no collisions in free flight
     updateReadout(realDt);
   } else if (state === 'title') {
@@ -372,7 +436,8 @@ function frame(now: number): void {
     ship.update(dt, yaw, pitch); // attract mode: no collisions
     updateAids(yaw, pitch);
   } else if (state === 'playing') {
-    ship.speed = Math.min(CONFIG.ship.maxSpeed, CONFIG.ship.startSpeed + score * CONFIG.ship.speedPerRing);
+    baseSpeed = Math.min(CONFIG.ship.maxSpeed, CONFIG.ship.startSpeed + score * CONFIG.ship.speedPerRing);
+    updateBoost(dt);
     ship.update(dt, input.yaw, input.pitch);
     updateAids(input.yaw, input.pitch);
     const hit = checkCollision(ship.prevPosition, ship.position, obstacles.items, hitRadius(hud.aids));
@@ -400,11 +465,13 @@ function frame(now: number): void {
   particles.update(dt);
   if (blastLight.intensity > 0) blastLight.intensity = Math.max(0, blastLight.intensity * Math.exp(-3.5 * realDt) - 0.5);
   updateCamera(dt, realDt);
+  updateFov(dt);
+  speedLines.update(state === 'dead' ? 0 : ship.boost, ship.position, ship.direction, camera, mode === 'tunnel');
   if (mode === 'free') {
     ship.dimForWall(null);
     space.update(dt, camera, ship.position);
   }
-  renderer.setAberration(state === 'dead' ? shake * 0.08 : 0.004 + (ship.speed - CONFIG.ship.startSpeed) * 0.0006);
+  renderer.setAberration(state === 'dead' ? shake * 0.08 : 0.004 + (baseSpeed - CONFIG.ship.startSpeed) * 0.0006 + ship.boost * 0.03);
   renderer.render();
   requestAnimationFrame(frame);
 }
@@ -449,6 +516,10 @@ requestAnimationFrame(frame);
   obstacles,
   fps: () => frameTimes.length / frameTimes.reduce((a, b) => a + b, 0),
   start: startGame,
+  boost: tryBoost,
+  get boostState() {
+    return { left: boostLeft, level: boostLevel, steerScale: input.steerScale, speed: ship.speed, base: baseSpeed };
+  },
   pause: (on: boolean) => {
     paused = on;
   },

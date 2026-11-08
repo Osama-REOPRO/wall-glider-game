@@ -40,6 +40,21 @@ A small triangular ship flies forward on its own down an endless tunnel. The pla
 - Arrow keys/WASD and Space work on desktop for testing. Keys aimed at a focused button or checkbox are ignored by the game.
 - Open question: whether the heading should drift back to centre when the finger lifts.
 
+## Boost
+
+A risk/reward move for advanced players who want to go faster, asked for by the designer.
+
+- **Double tap to boost** ("nitro"). The ship flies **1.85× faster** (`speedMultiplier`) for **one wall's spacing**: the distance from the next wall to the one after it. In free flight, where there are no walls, a boost lasts 100 units. It ramps up in 0.12 s and winds down over 0.4 s.
+- **While boosting, steering drops to 30%** (`steerScale`): the same drag turns the ship much less. **That's the core of the design.** You have to line up with the next gap *before* you boost, because you won't have the manoeuvrability to correct afterwards. Boost rewards planning, not reflexes. Keyboard steering is scaled the same way.
+- **Double-tap detection** is kept apart from steering. Each tap must be shorter than 250 ms and move less than 14 px, and the second press must come within 330 ms of the first release and within 70 px of it. A drag never counts as a tap, so steering can't trigger a boost by accident. The tap that starts a run can't pair with a follow-up tap (no boost in the first 0.4 s), and you can't re-trigger a boost while one is running. There's no cooldown: the limit is that a boost commits you to a line.
+- **Effects, all in the world:**
+  - **Ignition:** a white-hot burst from the engines, a kick of camera shake, and a short vibration on Android.
+  - **Engine and flame:** the engine glow grows, flickers and turns white-violet. The trail becomes a denser, hotter nitro flame.
+  - **Speed lines:** thin streaks of light hang in the air along the flight path and rush past. They're kept at least 3.5 units off the flight path; streaks right beside the camera turned into huge white slashes.
+  - **Camera:** the field of view kicks out by 16° (it opens fast and closes slowly), and the colour fringing at the screen edges strengthens. The camera also lags a little further behind at the higher speed, which reads as being pulled back.
+- **Not decided yet:** whether boosting should score more (for example, double points for gaps passed while boosting) to reward the risk. Today it only gets you there faster.
+- Desktop testing: Shift or B boosts.
+
 ## Level
 
 - **Tunnel:** a single open cylinder that snaps forward in whole texture periods, so it looks endless with one draw call and never needs rebuilding.

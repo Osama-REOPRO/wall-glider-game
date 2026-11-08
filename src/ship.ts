@@ -13,6 +13,10 @@ export class Ship {
   /** How far ahead of the ship the light sits. */
   readonly lightAhead = 9;
   private engineGlow: THREE.Sprite;
+  private glowColor = new THREE.Color(1.0, 0.6, 0.3).multiplyScalar(0.7);
+  private boostColor = new THREE.Color(1.6, 1.3, 1.6);
+  /** 0..1 boost level: enlarges and whitens the engine glow. */
+  boost = 0;
   private hullMat: THREE.MeshStandardMaterial;
 
   readonly position = new THREE.Vector3();
@@ -159,7 +163,8 @@ export class Ship {
 
     // Engine flicker.
     const f = 1 + Math.sin(this.time * 60) * 0.08 + Math.sin(this.time * 23) * 0.06;
-    this.engineGlow.scale.setScalar(0.55 * f);
+    this.engineGlow.scale.setScalar((0.55 + this.boost * 1.1) * f * (1 + this.boost * 0.15 * Math.sin(this.time * 90)));
+    this.engineGlow.material.color.copy(this.glowColor).lerp(this.boostColor, this.boost);
   }
 
   /** World-space point just behind the engines, where the exhaust trail is emitted. */

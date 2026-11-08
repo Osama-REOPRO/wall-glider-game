@@ -11,6 +11,19 @@ export class SteerInput {
   pitch = 0;
   /** Fires on any tap/press (used for start/restart). */
   onPress: (() => void) | null = null;
+  /** Fires on a quick double tap (two short taps close together in time and place). */
+  onDoubleTap: (() => void) | null = null;
+  /** Multiplier on steering sensitivity (lowered while boosting). */
+  steerScale = 1;
+
+  /** Tap tracking for double-tap detection. */
+  private downTime = 0;
+  private downX = 0;
+  private downY = 0;
+  private travel = 0;
+  private lastTapTime = -1e9;
+  private lastTapX = 0;
+  private lastTapY = 0;
 
   private activeId: number | null = null;
   private lastX = 0;
@@ -28,6 +41,10 @@ export class SteerInput {
       this.activeId = e.pointerId;
       this.lastX = e.clientX;
       this.lastY = e.clientY;
+      this.downTime = performance.now();
+      this.downX = e.clientX;
+      this.downY = e.clientY;
+      this.travel = 0;
       target.setPointerCapture?.(e.pointerId);
       this.onPress?.();
       e.preventDefault();
@@ -38,8 +55,9 @@ export class SteerInput {
       const dy = e.clientY - this.lastY;
       this.lastX = e.clientX;
       this.lastY = e.clientY;
+      this.travel += Math.hypot(dx, dy);
       if (!this.enabled) return;
-      const scale = CONFIG.ship.steerSensitivity / Math.min(window.innerWidth, window.innerHeight);
+      const scale = (CONFIG.ship.steerSensitivity * this.steerScale) / Math.min(window.innerWidth, window.innerHeight);
       this.yaw += dx * scale;
       this.pitch -= dy * scale;
       this.clamp();
@@ -48,21 +66,48 @@ export class SteerInput {
     const end = (e: PointerEvent) => {
       if (e.pointerId === this.activeId) this.activeId = null;
     };
-    target.addEventListener('pointerup', end);
+    target.addEventListener('pointerup', (e) => {
+      if (e.pointerId === this.activeId) this.detectTap(e.clientX, e.clientY);
+      end(e);
+    });
     target.addEventListener('pointercancel', end);
     // Keyboard fallback for desktop testing.
     window.addEventListener('keydown', (e) => {
       // Keys aimed at a focused button or checkbox belong to it, not to the game.
       if (e.target instanceof HTMLElement && e.target.closest('button, input, label')) return;
       if (e.code === 'Space' || e.code === 'Enter') this.onPress?.();
+      if (e.code === 'ShiftLeft' || e.code === 'ShiftRight' || e.code === 'KeyB') this.onDoubleTap?.();
       if (!this.enabled) return;
-      const step = 0.06;
+      const step = 0.06 * this.steerScale;
       if (e.code === 'ArrowLeft' || e.code === 'KeyA') this.yaw -= step;
       if (e.code === 'ArrowRight' || e.code === 'KeyD') this.yaw += step;
       if (e.code === 'ArrowUp' || e.code === 'KeyW') this.pitch += step;
       if (e.code === 'ArrowDown' || e.code === 'KeyS') this.pitch -= step;
       this.clamp();
     });
+  }
+
+  /**
+   * A tap is a short press that barely moved, so it never fights with steering drags.
+   * Two taps close together in time and place make a double tap.
+   */
+  private detectTap(x: number, y: number): void {
+    const B = CONFIG.boost;
+    const now = performance.now();
+    const isTap = now - this.downTime < B.tapMaxMs && this.travel < B.tapMaxMove && Math.hypot(x - this.downX, y - this.downY) < B.tapMaxMove;
+    if (!isTap) {
+      this.lastTapTime = -1e9;
+      return;
+    }
+    // The gap is measured from the first tap's release to the second tap's press.
+    if (this.downTime - this.lastTapTime < B.doubleTapMs && Math.hypot(x - this.lastTapX, y - this.lastTapY) < B.doubleTapMaxGap) {
+      this.lastTapTime = -1e9; // a third tap starts a new pair
+      this.onDoubleTap?.();
+      return;
+    }
+    this.lastTapTime = now;
+    this.lastTapX = x;
+    this.lastTapY = y;
   }
 
   reset(): void {

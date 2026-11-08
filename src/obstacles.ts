@@ -318,6 +318,15 @@ export class Obstacles {
     }
   }
 
+  /** Distance between the next wall and the one after it (the current spacing). */
+  spacingAhead(shipZ: number): number {
+    const next = this.nextAhead(shipZ);
+    if (!next) return CONFIG.obstacles.startSpacing;
+    let after: Obstacle | null = null;
+    for (const o of this.items) if (o.z < next.z && (after === null || o.z > after.z)) after = o;
+    return after ? next.z - after.z : CONFIG.obstacles.startSpacing;
+  }
+
   /** The nearest wall still ahead of the ship. */
   nextAhead(shipZ: number): Obstacle | null {
     let next: Obstacle | null = null;

@@ -79,6 +79,26 @@ export const CONFIG = {
     headlightAngle: 0.13,
     headlightIntensity: 900,
   },
+  /** Boost ("nitro"): double tap to fly much faster, with much less steering, for one wall's spacing. */
+  boost: {
+    /** Speed multiplier at full boost. */
+    speedMultiplier: 1.85,
+    /** Steering sensitivity multiplier at full boost (lower = commit to your line before boosting). */
+    steerScale: 0.3,
+    /** Seconds to reach full boost, and to wind back down after it ends. */
+    rampUp: 0.12,
+    rampDown: 0.4,
+    /** Free flight has no walls, so a boost there lasts this far. */
+    freeFlightDistance: 100,
+    /** Extra field of view (degrees) at full boost. */
+    fovKick: 16,
+    /** Double tap: each tap shorter than this (ms) and moving less than this (px)... */
+    tapMaxMs: 250,
+    tapMaxMove: 14,
+    /** ...with the second pressed within this many ms of the first's release, and this many px from it. */
+    doubleTapMs: 330,
+    doubleTapMaxGap: 70,
+  },
   /** Free-flight mode: open space, no tube, no obstacles. */
   space: {
     speed: 30,

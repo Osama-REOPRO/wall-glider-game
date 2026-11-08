@@ -140,7 +140,7 @@ export class Hud {
 
   showTitle(): void {
     this.title.textContent = 'WALL GLIDER';
-    this.sub.textContent = 'Drag to steer. Fly through the gaps.';
+    this.sub.textContent = 'Drag to steer. Fly through the gaps. Double-tap to boost.';
     this.cta.textContent = 'Tap to start';
     this.overlay.classList.add('visible');
     this.showScore(false);
