@@ -53,6 +53,11 @@ html, body {
   transition: transform 120ms ease-out;
 }
 #score.bump { transform: scale(1.25); }
+#score.bump-double {
+  transform: scale(1.5);
+  color: #e3c8ff;
+  text-shadow: 0 0 22px rgba(170, 90, 255, 0.95), 0 0 48px rgba(170, 90, 255, 0.6);
+}
 
 #best {
   margin-top: 6px;

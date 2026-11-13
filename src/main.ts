@@ -91,7 +91,10 @@ let runTime = 0;
 let baseSpeed: number = CONFIG.ship.startSpeed;
 /** Debug: freezes the simulation while rendering continues (used by automated screenshots). */
 let paused = false;
+/** Points. A gap passed while boosting is worth double. */
 let score = 0;
+/** Gaps passed this run. Drives speed and zone colour, so double points don't speed the game up. */
+let rings = 0;
 let deadTime = 0;
 let timeScale = 1;
 let shake = 0;
@@ -132,6 +135,7 @@ function resetWorld(): void {
   particles.clear();
   dust.reset(ship.position.z);
   score = 0;
+  rings = 0;
   zone = -1;
   setZone(0);
   hud.setScore(0);
@@ -309,10 +313,11 @@ const TRAIL = { life: 0.5, size: 0.1, endSize: 0.26, color: COLORS.trailHot, end
 const BOOST_TRAIL = { life: 0.55, size: 0.16, endSize: 0.3, color: COLORS.boostHot, endColor: COLORS.boostCool, drag: 1.2 };
 const CONTRAIL = { life: 0.4, size: 0.055, endSize: 0.012, color: COLORS.contrail, endColor: COLORS.trailCool };
 
-function passBurst(o: (typeof obstacles.items)[number]): void {
+function passBurst(o: (typeof obstacles.items)[number], boosted = false): void {
   o.flash = 1;
-  const color = o.baseColor.clone().multiplyScalar(3);
-  for (let i = 0; i < 120; i++) {
+  // A boosted pass bursts in the boost's violet, bigger, so double points read in the world too.
+  const color = boosted ? COLORS.boostCool.clone().multiplyScalar(2.2) : o.baseColor.clone().multiplyScalar(3);
+  for (let i = 0; i < (boosted ? 200 : 120); i++) {
     o.randomRimPoint(tmpA);
     particles.emit(tmpA.x, tmpA.y, tmpA.z, (Math.random() - 0.5) * 6, (Math.random() - 0.5) * 6, (Math.random() - 0.5) * 6, {
       life: 0.8,
@@ -465,7 +470,7 @@ function frame(now: number): void {
     ship.update(dt, yaw, pitch); // attract mode: no collisions
     updateAids(yaw, pitch);
   } else if (state === 'playing') {
-    baseSpeed = Math.min(CONFIG.ship.maxSpeed, CONFIG.ship.startSpeed + score * CONFIG.ship.speedPerRing);
+    baseSpeed = Math.min(CONFIG.ship.maxSpeed, CONFIG.ship.startSpeed + rings * CONFIG.ship.speedPerRing);
     updateBoost(dt);
     ship.update(dt, input.yaw, input.pitch);
     updateAids(input.yaw, input.pitch);
@@ -473,10 +478,14 @@ function frame(now: number): void {
     if (hit.type === 'wall' || hit.type === 'obstacle') {
       crash(hit.point);
     } else if (hit.type === 'passed') {
-      score++;
-      hud.setScore(score, true);
-      passBurst(hit.obstacle);
-      setZone(score);
+      // Boosting through a gap scores double: the reward for committing to a line at speed.
+      // It counts while the boost is running, or still at least half on as it winds down.
+      const boosted = boostLeft > 0 || boostLevel > 0.5;
+      rings++;
+      score += boosted ? CONFIG.boost.gapPoints : 1;
+      hud.setScore(score, true, boosted);
+      passBurst(hit.obstacle, boosted);
+      setZone(rings);
     }
   }
 
@@ -521,6 +530,9 @@ requestAnimationFrame(frame);
   },
   get score() {
     return score;
+  },
+  get rings() {
+    return rings;
   },
   get mode() {
     return mode;

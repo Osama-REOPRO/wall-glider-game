@@ -57,7 +57,9 @@ A risk/reward move for advanced players who want to go faster, asked for by the 
   - **Why violet:** it's the colour of the boost flame, so the pad reads as "boost" at a glance. It's also distinct from every zone colour (cyan, magenta, amber, green tunnel lights; orange, mint, blue, red gap rims). The panel stays mostly below the bloom threshold, so it looks violet rather than blown out to white. A violet point light near the next live pad tints the ship and walls as you pass.
   - **Placement:** from the 4th wall on, with a 40% chance per stretch between walls (`pads` in `src/config.ts`). The pad sits in the middle of the stretch, on the side of the tunnel facing the next wall's gap, with some random spread. That way a line over the pad can carry you on toward the opening, but you have to fly near the wall to take it.
   - **Risk/reward:** taking a pad means flying close to the tunnel wall, then arriving at the next wall at boost speed with 30% steering. It's an optional line for advanced players, the same idea as the manual boost.
-- **Not decided yet:** whether boosting should score more (for example, double points for gaps passed while boosting) to reward the risk. Today it only gets you there faster.
+- **Boosting through a gap scores double** (`gapPoints`: 2 instead of 1), the reward for committing to a line at speed. It counts while the boost is running, or still at least half on as it winds down.
+  - The score bump turns violet and bigger, and the pass burst is violet and denser, so a double reads in the world as well as on the counter.
+  - **Speed and zone colour are driven by gaps passed, not points.** Otherwise double points would also speed the game up and skip colour zones.
 - Desktop testing: Shift or B boosts.
 
 ## Level

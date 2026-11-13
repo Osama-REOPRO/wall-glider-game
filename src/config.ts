@@ -81,6 +81,8 @@ export const CONFIG = {
   },
   /** Boost ("nitro"): double tap to fly much faster, with much less steering, for one wall's spacing. */
   boost: {
+    /** Points for a gap passed while boosting (a normal gap is 1). */
+    gapPoints: 2,
     /** Speed multiplier at full boost. */
     speedMultiplier: 1.85,
     /** Steering sensitivity multiplier at full boost (lower = commit to your line before boosting). */
