@@ -14,6 +14,7 @@ import { Space } from './space';
 import { WallShadow, TargetMarker, predict, hitRadius, type Prediction } from './aids';
 import { WorldCues } from './worldcues';
 import { SpeedLines } from './boost';
+import { BoostPads } from './boostpads';
 
 type State = 'title' | 'playing' | 'dead';
 /** 'tunnel' is the game. 'free' is open space with no obstacles, for testing the controls. */
@@ -51,6 +52,10 @@ scene.add(shadow.group, marker.group);
 const cues = new WorldCues(scene, particles);
 const speedLines = new SpeedLines();
 scene.add(speedLines.mesh);
+const pads = new BoostPads(fogColor, tunnelFog.density);
+scene.add(pads.group);
+const padGap = new THREE.Vector2();
+obstacles.onSpawn = (o, index, stretchStartZ) => pads.onWallSpawned(o, index, stretchStartZ, o.gapCenter(padGap));
 const space = new Space();
 space.group.visible = false;
 scene.add(space.group);
@@ -122,6 +127,7 @@ function setZone(n: number): void {
 function resetWorld(): void {
   ship.reset();
   input.reset();
+  pads.clear(); // before the walls respawn, since each spawn may place a pad
   obstacles.reset(ship.position.z);
   particles.clear();
   dust.reset(ship.position.z);
@@ -150,6 +156,7 @@ function setMode(m: Mode): void {
   const tunnel = m === 'tunnel';
   tube.mesh.visible = tunnel;
   obstacles.group.visible = tunnel;
+  pads.group.visible = tunnel;
   dust.points.visible = tunnel;
   space.group.visible = !tunnel;
   scene.fog = tunnel ? tunnelFog : null;
@@ -211,7 +218,29 @@ function crash(point: THREE.Vector3): void {
  */
 function tryBoost(): void {
   if (state !== 'playing' || boostLeft > 0 || runTime < 0.4) return;
-  boostLeft = mode === 'tunnel' ? obstacles.spacingAhead(ship.position.z) : CONFIG.boost.freeFlightDistance;
+  igniteBoost(mode === 'tunnel' ? obstacles.spacingAhead(ship.position.z) : CONFIG.boost.freeFlightDistance);
+}
+
+/**
+ * A boost pad fired: start a boost, or extend the one already running by a wall spacing.
+ * Unlike the double tap it has no start-of-run guard, and it does stack.
+ */
+function padBoost(): void {
+  if (state !== 'playing') return;
+  const spacing = obstacles.spacingAhead(ship.position.z);
+  if (boostLeft > 0) {
+    boostLeft += spacing * CONFIG.pads.extendSpacings;
+    // A smaller kick, so the extension is felt as well as seen.
+    shake = Math.max(shake, 0.25);
+    const tail = ship.tailPosition(tmpA);
+    particles.burst(tail, 40, 10, { life: 0.4, size: 0.16, endSize: 0, color: COLORS.boostHot, endColor: COLORS.boostCool, drag: 3 });
+  } else {
+    igniteBoost(spacing);
+  }
+}
+
+function igniteBoost(distance: number): void {
+  boostLeft = distance;
   // Ignition: a white-hot burst from the engines, a kick of camera shake, a buzz.
   const tail = ship.tailPosition(tmpA);
   tmpB.copy(ship.direction).multiplyScalar(-ship.speed * 0.3);
@@ -456,6 +485,7 @@ function frame(now: number): void {
   if (state !== 'dead') emitTrail(dt);
 
   if (mode === 'tunnel') {
+    if (pads.update(dt, ship.position, state === 'playing')) padBoost();
     const next = obstacles.nextAhead(ship.position.z);
     ship.dimForWall(next ? ship.position.z - (next.z + CONFIG.obstacles.thickness / 2) : null);
     obstacles.update(dt, ship.position.z);
@@ -517,6 +547,7 @@ requestAnimationFrame(frame);
   fps: () => frameTimes.length / frameTimes.reduce((a, b) => a + b, 0),
   start: startGame,
   boost: tryBoost,
+  pads,
   get boostState() {
     return { left: boostLeft, level: boostLevel, steerScale: input.steerScale, speed: ship.speed, base: baseSpeed };
   },

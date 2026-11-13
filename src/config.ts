@@ -99,6 +99,25 @@ export const CONFIG = {
     doubleTapMs: 330,
     doubleTapMaxGap: 70,
   },
+  /** Boost pads: violet panels on the tunnel wall that trigger (or extend) the boost when flown over closely. */
+  pads: {
+    /** Pads can appear from this wall on (0 = the first)... */
+    firstWall: 3,
+    /** ...in the stretch before a wall, with this probability. */
+    chance: 0.4,
+    /** Length along the tunnel, and angular width (radians) of each pad. */
+    length: 16,
+    arc: 0.42,
+    /** Trigger when the ship's centre is within this distance of the tunnel wall... */
+    triggerDistance: 3.2,
+    /** ...and within this many units beyond the pad's side edges. */
+    sideMargin: 0.8,
+    /** Random spread (radians) around the side of the tunnel facing the next gap. */
+    angleJitter: 0.8,
+    /** A pad triggered while boosting adds this many wall spacings of boost. */
+    extendSpacings: 1,
+    pool: 4,
+  },
   /** Free-flight mode: open space, no tube, no obstacles. */
   space: {
     speed: 30,

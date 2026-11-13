@@ -233,6 +233,13 @@ export class Obstacles {
   /** Light that sits in the next gap, coloured like its rim, so the walls ahead glow around it. */
   readonly gapLight: THREE.PointLight;
   private spawned = 0;
+  /** z of the most recently spawned wall (or the run's start), i.e. where the stretch before the next wall begins. */
+  private lastSpawnZ = 0;
+  /**
+   * Called after each wall is placed, with the z where the stretch leading up to it begins.
+   * Boost pads use it to put themselves on the tunnel wall in that stretch.
+   */
+  onSpawn: ((o: Obstacle, index: number, stretchStartZ: number) => void) | null = null;
   private nextZ = 0;
   private lastGap = new THREE.Vector2();
 
@@ -258,6 +265,7 @@ export class Obstacles {
   reset(shipZ: number): void {
     this.spawned = 0;
     this.nextZ = shipZ - CONFIG.obstacles.firstAt;
+    this.lastSpawnZ = shipZ;
     this.lastGap.set(0, 0);
     for (const o of this.items) this.respawn(o);
   }
@@ -301,6 +309,8 @@ export class Obstacles {
     }
     o.gapCenter(this.lastGap);
     o.mesh.position.z = o.z;
+    this.onSpawn?.(o, n, this.lastSpawnZ);
+    this.lastSpawnZ = o.z;
   }
 
   /** Recycle walls that are behind the ship and keep the gap light on the next wall. */

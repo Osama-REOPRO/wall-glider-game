@@ -2,7 +2,7 @@
 
 A 3D mobile prototype. A triangular ship flies on its own down an endless tube, and you only control its heading: drag a finger to turn the nose and the ship flies that way. Fly through the gaps in the walls without touching anything.
 
-**Boost:** double-tap to fly much faster for one wall's spacing, with much less steering, so line up first. Shift or B on desktop.
+**Boost:** double-tap to fly much faster for one wall's spacing, with much less steering, so line up first. Shift or B on desktop. Violet **boost pads** on the tunnel wall trigger the boost automatically when you fly close over them, or extend it if you're already boosting.
 
 **Free flight** (the menu button, or a link ending in `#free`) is an open-space sandbox for testing the controls. There's no tunnel and no obstacles, turning is unlimited (pitch stops short of straight up and down), and a readout shows heading, pitch and speed.
 
@@ -47,5 +47,6 @@ Desktop testing: drag with the mouse, or use the arrow keys / WASD. Space starts
 | `src/aids.ts` | Flight aids: predicts where the ship will cross the next wall (same test as the collision check), and draws the projected shadow. |
 | `src/worldcues.ts` | Optional in-world cues: electric arcs to the nearest surface, headlight, wall heat glow, bow-wave dust. |
 | `src/boost.ts` | Speed-line streaks shown while boosting. (Boost timing, speed and steering live in `main.ts`; double-tap detection in `input.ts`.) |
+| `src/boostpads.ts` | Boost pads on the tunnel wall: placement, chevron shader, proximity trigger. |
 | `src/textures.ts` | Canvas-generated hull panels, normal maps (Sobel from height), emissive light strips, hazard stripes. |
 | `src/hud.ts` | Score, best score (localStorage), title and game-over overlay, mode buttons, Aids panel, HI/LO quality toggle. |
