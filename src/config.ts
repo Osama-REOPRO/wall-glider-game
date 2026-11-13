@@ -37,6 +37,14 @@ export const CONFIG = {
     minHole: 2.4,
     holePerRing: 0.09,
     thickness: 1.6,
+    /** Bonus gap: radius as a fraction of the main gap's, within these limits... */
+    bonusScale: 0.32,
+    bonusMinR: 1.0,
+    bonusMaxR: 1.7,
+    /** ...with at least this much solid wall between it and the main gap. */
+    bonusClearance: 1.5,
+    /** Points for flying through a bonus gap (a normal gap is 1). Boosting doubles it too. */
+    bonusPoints: 10,
     /**
      * Distance the ship travels past a wall while it fades out. Keep it below the camera
      * distance so the wall is gone before the camera reaches it.

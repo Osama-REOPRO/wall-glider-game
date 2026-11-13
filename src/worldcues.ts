@@ -404,7 +404,7 @@ export class BowWave {
       // Crossing the next wall's face: splash on solid wall, stream through the gap.
       if (ahead) {
         const face = ahead.o.z + FACE;
-        if (pz > face && z <= face && !ahead.o.fits(x, y, 0)) {
+        if (pz > face && z <= face && !ahead.o.fits(x, y, 0) && !ahead.o.fitsBonus(x, y, 0)) {
           this.splashAt(x, y, face + 0.05);
           this.kill(i);
           continue;

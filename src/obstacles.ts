@@ -14,6 +14,15 @@ export class Obstacle {
   cx = 0;
   cy = 0;
   r = 2;
+  /** Bonus gap: a small round hole in the local frame (bonusR = 0 means none). */
+  bonusX = 0;
+  bonusY = 0;
+  bonusR = 0;
+  /** Set when the ship flies through the bonus gap (the ring then flashes and goes dark). */
+  bonusTaken = false;
+  bonusFlash = 0;
+  private bonusRing: THREE.Mesh;
+  private bonusMat: THREE.MeshBasicMaterial;
   angle = 0;
   spin = 0;
   passed = false;
@@ -41,10 +50,24 @@ export class Obstacle {
     // Both materials are always in the transparent pass so fading never needs a shader rebuild.
     for (const m of [this.capMaterial, this.rimMaterial]) m.transparent = true;
     this.mesh = new THREE.Mesh(new THREE.BufferGeometry(), [this.capMaterial, this.rimMaterial]);
+    // Gold ring on the bonus gap's front edge, a child of the wall so it turns and fades with it.
+    this.bonusMat = new THREE.MeshBasicMaterial({ color: BONUS_GOLD.clone(), transparent: true });
+    this.bonusRing = new THREE.Mesh(new THREE.TorusGeometry(1, 0.09, 8, 40), this.bonusMat);
+    this.bonusRing.position.z = CONFIG.obstacles.thickness / 2 + 0.1;
+    this.mesh.add(this.bonusRing);
   }
 
   /** Rebuild the geometry for a new hole. Called only when the obstacle is recycled, never per frame. */
-  build(kind: HoleKind, cx: number, cy: number, r: number, angle: number, spin: number): void {
+  build(kind: HoleKind, cx: number, cy: number, r: number, angle: number, spin: number, bonus?: { x: number; y: number; r: number }): void {
+    this.bonusX = bonus?.x ?? 0;
+    this.bonusY = bonus?.y ?? 0;
+    this.bonusR = bonus?.r ?? 0;
+    this.bonusTaken = false;
+    this.bonusFlash = 0;
+    this.bonusRing.visible = this.bonusR > 0;
+    this.bonusRing.position.x = this.bonusX;
+    this.bonusRing.position.y = this.bonusY;
+    this.bonusRing.scale.set(this.bonusR, this.bonusR, 1);
     this.kind = kind;
     this.cx = cx;
     this.cy = cy;
@@ -65,6 +88,7 @@ export class Obstacle {
       hole.absarc(cx, cy, r, 0, Math.PI * 2, true);
       s.holes.push(hole);
       shapes.push(s);
+      if (this.bonusR > 0) s.holes.push(this.bonusPath());
     } else {
       // Two circular segments, above and below a horizontal band (rotated by `angle`).
       const top = cy + r;
@@ -81,6 +105,8 @@ export class Obstacle {
       s2.absarc(0, 0, R, Math.PI - b0, Math.PI * 2 + b0, false);
       s2.lineTo(-R * Math.cos(b0), bottom);
       shapes.push(s2);
+      // The bonus hole sits in whichever segment contains it.
+      if (this.bonusR > 0) (this.bonusY > cy ? s1 : s2).holes.push(this.bonusPath());
     }
 
     const depth = CONFIG.obstacles.thickness;
@@ -96,6 +122,12 @@ export class Obstacle {
     this.mesh.geometry.dispose();
     this.mesh.geometry = geo;
     this.mesh.rotation.z = angle;
+  }
+
+  private bonusPath(): THREE.Path {
+    const p = new THREE.Path();
+    p.absarc(this.bonusX, this.bonusY, this.bonusR, 0, Math.PI * 2, true);
+    return p;
   }
 
   /**
@@ -114,6 +146,7 @@ export class Obstacle {
     this.opacity = a;
     this.capMaterial.opacity = a;
     this.rimMaterial.opacity = a;
+    this.bonusMat.opacity = a;
     // A fading wall must not hide what's behind it in the depth buffer.
     const solid = a >= 1;
     this.capMaterial.depthWrite = solid;
@@ -134,6 +167,12 @@ export class Obstacle {
     const pulse = this.warn > 0 ? this.warn * (0.65 + 0.35 * Math.sin(this.time * 20)) : 0;
     this.rimMaterial.emissive.copy(this.baseColor).lerp(WARN_RED, pulse).lerp(WHITE, this.flash);
     this.rimMaterial.emissiveIntensity = 2.2 + pulse * 2.5 + this.flash * 4;
+    // Bonus ring: a slow shimmer while it's on offer; a white flash, then dark, once taken.
+    if (this.bonusR > 0) {
+      if (this.bonusFlash > 0) this.bonusFlash = Math.max(0, this.bonusFlash - dt * 2);
+      const shimmer = this.bonusTaken ? 0.15 : 0.85 + 0.15 * Math.sin(this.time * 6);
+      this.bonusMat.color.copy(BONUS_GOLD).multiplyScalar(shimmer).lerp(BONUS_FLASH, this.bonusFlash);
+    }
   }
 
   /** Transform a world (x, y) into this obstacle's local frame (optionally at another rotation). */
@@ -151,6 +190,23 @@ export class Obstacle {
     const p = this.toLocal(x, y, tmp2, angle);
     if (this.kind === 'circle') return Math.hypot(p.x - this.cx, p.y - this.cy) <= this.r - margin;
     return Math.abs(p.y - this.cy) <= this.r - margin;
+  }
+
+  /** True if a sphere of radius `margin` at world (x, y) fits through the bonus gap. */
+  fitsBonus(x: number, y: number, margin: number, angle = this.angle): boolean {
+    if (this.bonusR <= 0) return false;
+    const p = this.toLocal(x, y, tmp2, angle);
+    return Math.hypot(p.x - this.bonusX, p.y - this.bonusY) <= this.bonusR - margin;
+  }
+
+  /** A random world-space point on the bonus gap's ring (for its burst). */
+  randomBonusPoint(out: THREE.Vector3): THREE.Vector3 {
+    const a = Math.random() * Math.PI * 2;
+    const lx = this.bonusX + Math.cos(a) * this.bonusR;
+    const ly = this.bonusY + Math.sin(a) * this.bonusR;
+    const c = Math.cos(this.angle);
+    const s = Math.sin(this.angle);
+    return out.set(lx * c - ly * s, lx * s + ly * c, this.z + CONFIG.obstacles.thickness / 2);
   }
 
   /**
@@ -215,6 +271,9 @@ export class Obstacle {
 
 const WHITE = new THREE.Color(1, 1, 1);
 const WARN_RED = new THREE.Color(1, 0.04, 0.02);
+/** Bonus gap ring: bright gold, unlike any zone colour or the boost's violet. */
+const BONUS_GOLD = new THREE.Color(3.2, 2.2, 0.45);
+const BONUS_FLASH = new THREE.Color(4, 4, 3.5);
 const tmp2 = new THREE.Vector2();
 const tmpGap = new THREE.Vector2();
 
@@ -297,20 +356,40 @@ export class Obstacles {
         const off = n === 0 ? 0 : Math.sqrt(Math.random()) * maxOff;
         cx = Math.cos(angle) * off;
         cy = Math.sin(angle) * off;
-        o.build('circle', cx, cy, r, 0, 0);
+        Object.assign(o, { kind, cx, cy, r, angle: 0 });
       } else {
         r = holeR * 0.85; // slot half-height; slots are long, so a bit tighter
         const maxOff = Math.max(0, R - r - 1.2);
         cy = (Math.random() * 2 - 1) * maxOff;
-        o.build('slot', 0, cy, r, angle, spin);
+        Object.assign(o, { kind, cx: 0, cy, r, angle });
       }
       o.gapCenter(tmpGap);
       if (tmpGap.distanceTo(this.lastGap) <= maxJump || attempt === 23) break;
     }
+    o.build(o.kind, o.cx, o.cy, o.r, o.angle, o.kind === 'slot' ? spin : 0, this.pickBonus(o, holeR));
     o.gapCenter(this.lastGap);
     o.mesh.position.z = o.z;
     this.onSpawn?.(o, n, this.lastSpawnZ);
     this.lastSpawnZ = o.z;
+  }
+
+  /**
+   * A small bonus hole somewhere on the wall's solid part, well clear of the main gap and the tunnel
+   * wall. It shrinks with the main gap. Returns undefined if no spot fits.
+   */
+  private pickBonus(o: Obstacle, holeR: number): { x: number; y: number; r: number } | undefined {
+    const B = CONFIG.obstacles;
+    const br = THREE.MathUtils.clamp(holeR * B.bonusScale, B.bonusMinR, B.bonusMaxR);
+    const maxR = CONFIG.tube.radius - br - 1.2;
+    for (let i = 0; i < 40; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const d = Math.sqrt(Math.random()) * maxR;
+      const x = Math.cos(a) * d;
+      const y = Math.sin(a) * d;
+      const clear = o.kind === 'circle' ? Math.hypot(x - o.cx, y - o.cy) - o.r : Math.abs(y - o.cy) - o.r;
+      if (clear >= br + B.bonusClearance) return { x, y, r: br };
+    }
+    return undefined;
   }
 
   /** Recycle walls that are behind the ship and keep the gap light on the next wall. */

@@ -6,7 +6,7 @@ export type Hit =
   | { type: 'none' }
   | { type: 'wall'; point: THREE.Vector3 }
   | { type: 'obstacle'; point: THREE.Vector3; obstacle: Obstacle }
-  | { type: 'passed'; obstacle: Obstacle };
+  | { type: 'passed'; obstacle: Obstacle; bonus: boolean };
 
 const hitPoint = new THREE.Vector3();
 /** Extra clearance for the walls' bevelled edges. Shared with the flight aids' prediction. */
@@ -44,13 +44,15 @@ export function checkCollision(
     const t = Math.abs(dz) > 1e-6 ? THREE.MathUtils.clamp((o.z - prev.z) / dz, 0, 1) : 1;
     const x = prev.x + (curr.x - prev.x) * t;
     const y = prev.y + (curr.y - prev.y) * t;
-    if (!o.fits(x, y, shipR + BEVEL)) {
+    const main = o.fits(x, y, shipR + BEVEL);
+    const bonus = !main && o.fitsBonus(x, y, shipR + BEVEL);
+    if (!main && !bonus) {
       hitPoint.set(x, y, o.z + CONFIG.obstacles.thickness / 2);
       return { type: 'obstacle', point: hitPoint, obstacle: o };
     }
     if (curr.z < o.z - half) {
       o.passed = true;
-      return { type: 'passed', obstacle: o };
+      return { type: 'passed', obstacle: o, bonus };
     }
   }
   return { type: 'none' };

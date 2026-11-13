@@ -67,6 +67,12 @@ A risk/reward move for advanced players who want to go faster, asked for by the 
 - **Tunnel:** a single open cylinder that snaps forward in whole texture periods, so it looks endless with one draw call and never needs rebuilding.
 - **Walls:** two kinds. A disc with a round hole, and a Flappy-style **slot** (a band across the tunnel at a random angle). After ring 8, some slots **spin**. Walls are pooled and their geometry is rebuilt only when one is recycled, never per frame.
 - **Gaps are always reachable:** how far the next gap can be from the previous one is capped by the spacing between them (`maxJump`).
+- **Bonus gaps:** every wall has a second, much smaller round hole with a shimmering **gold** ring, somewhere on its solid part.
+  - **Reward:** flying through it scores **10 points** (`bonusPoints`) instead of 1, and **triggers the boost automatically**, or extends one already running by a wall spacing, like a boost pad. Boosting doubles it too, so a bonus gap taken while boosting is worth 20. You can chain bonus gaps for a long, high-scoring boost.
+  - **Size:** about a third of the main gap's radius, kept between 1.0 and 1.7 (`bonusScale`, `bonusMinR`, `bonusMaxR`). It shrinks as the main gaps do. With the ship's 0.26 collision radius, the margin for error is small on purpose.
+  - **Placement:** at least 1.5 units of solid wall from the main gap (`bonusClearance`) and clear of the tunnel wall. On spinning slots it turns with the wall.
+  - **Why gold:** it reads as "treasure" and isn't any zone colour or the boost's violet. The ring flashes white and goes dark once taken.
+  - **Everything knows about it:** it's one more opening in the shared gap test, so collisions, the shadow's clipping, the rim warning's prediction and the bow-wave dust all treat it as open.
 - **Difficulty** comes from three things that tighten with every ring: speed (`speedPerRing`), spacing between walls, and gap size.
 - **Zones:** the accent palette changes every 10 rings, giving a sense of progress at no cost.
 

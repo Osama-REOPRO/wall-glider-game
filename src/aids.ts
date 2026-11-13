@@ -91,7 +91,8 @@ export function predict(
   if (Math.hypot(point.x, point.y) + radius >= CONFIG.tube.radius) outcome = 'tube';
   else {
     const arrivalAngle = o.angle + o.spin * timeToImpact;
-    outcome = o.fits(point.x, point.y, radius + BEVEL, arrivalAngle) ? 'pass' : 'wall';
+    const m = radius + BEVEL;
+    outcome = o.fits(point.x, point.y, m, arrivalAngle) || o.fitsBonus(point.x, point.y, m, arrivalAngle) ? 'pass' : 'wall';
   }
 
   const { fadeStart, fadeFull } = CONFIG.aids;
@@ -149,15 +150,17 @@ export const GAP_GLSL = /* glsl */ `
   uniform float uKind;   // 0 = circular hole, 1 = slot
   uniform vec3 uHole;    // circle: centre x, y and radius; slot: (unused, offset, half-height)
   uniform float uAngle;  // the wall's current rotation
+  uniform vec3 uBonus;   // bonus gap: centre x, y and radius (radius 0 = none)
   bool inGap(vec2 w) {
     float c = cos(-uAngle), sn = sin(-uAngle);
     vec2 g = vec2(w.x * c - w.y * sn, w.x * sn + w.y * c);
-    return uKind < 0.5 ? length(g - uHole.xy) < uHole.z : abs(g.y - uHole.y) < uHole.z;
+    bool mainGap = uKind < 0.5 ? length(g - uHole.xy) < uHole.z : abs(g.y - uHole.y) < uHole.z;
+    return mainGap || (uBonus.z > 0.0 && length(g - uBonus.xy) < uBonus.z);
   }
 `;
 
 export function gapUniforms(): Record<string, THREE.IUniform> {
-  return { uKind: { value: 0 }, uHole: { value: new THREE.Vector3() }, uAngle: { value: 0 } };
+  return { uKind: { value: 0 }, uHole: { value: new THREE.Vector3() }, uAngle: { value: 0 }, uBonus: { value: new THREE.Vector3() } };
 }
 
 /** Point the gap uniforms at a wall (the bevel makes the visible hole slightly smaller). */
@@ -165,6 +168,7 @@ export function setGapUniforms(u: Record<string, THREE.IUniform>, o: Obstacle): 
   u.uKind.value = o.kind === 'circle' ? 0 : 1;
   (u.uHole.value as THREE.Vector3).set(o.cx, o.cy, o.r - BEVEL);
   u.uAngle.value = o.angle;
+  (u.uBonus.value as THREE.Vector3).set(o.bonusX, o.bonusY, o.bonusR > 0 ? o.bonusR - BEVEL : 0);
 }
 
 const shadowVertex = /* glsl */ `

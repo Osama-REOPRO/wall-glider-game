@@ -226,10 +226,10 @@ function tryBoost(): void {
 }
 
 /**
- * A boost pad fired: start a boost, or extend the one already running by a wall spacing.
+ * A boost pad or bonus gap fired: start a boost, or extend the one already running by a wall spacing.
  * Unlike the double tap it has no start-of-run guard, and it does stack.
  */
-function padBoost(): void {
+function autoBoost(): void {
   if (state !== 'playing') return;
   const spacing = obstacles.spacingAhead(ship.position.z);
   if (boostLeft > 0) {
@@ -357,6 +357,28 @@ function clearAids(): void {
   for (const o of obstacles.items) o.warn = 0;
 }
 
+const BONUS_SPARK = new THREE.Color(3.2, 2.4, 0.6);
+const BONUS_EMBER = new THREE.Color(1.4, 0.5, 0.05);
+
+/** Gold burst from the bonus ring; the ring flashes and goes dark. */
+function bonusBurst(o: (typeof obstacles.items)[number]): void {
+  o.bonusTaken = true;
+  o.bonusFlash = 1;
+  for (let i = 0; i < 160; i++) {
+    o.randomBonusPoint(tmpA);
+    const a = Math.random() * Math.PI * 2;
+    const sp = 3 + Math.random() * 9;
+    particles.emit(tmpA.x, tmpA.y, tmpA.z, Math.cos(a) * sp, Math.sin(a) * sp, (Math.random() - 0.5) * 4, {
+      life: 0.9,
+      size: 0.26,
+      endSize: 0,
+      color: BONUS_SPARK,
+      endColor: BONUS_EMBER,
+      drag: 1.6,
+    });
+  }
+}
+
 /** Attract mode: steer toward the next gap so the title screen shows the game being played. */
 function autopilot(): [number, number] {
   const next = obstacles.nextAhead(ship.position.z);
@@ -482,9 +504,17 @@ function frame(now: number): void {
       // It counts while the boost is running, or still at least half on as it winds down.
       const boosted = boostLeft > 0 || boostLevel > 0.5;
       rings++;
-      score += boosted ? CONFIG.boost.gapPoints : 1;
-      hud.setScore(score, true, boosted);
-      passBurst(hit.obstacle, boosted);
+      if (hit.bonus) {
+        // Bonus gap: 10 points (doubled if boosting) and an automatic boost, or an extension.
+        score += CONFIG.obstacles.bonusPoints * (boosted ? CONFIG.boost.gapPoints : 1);
+        hud.setScore(score, true, 'bonus');
+        bonusBurst(hit.obstacle);
+        autoBoost();
+      } else {
+        score += boosted ? CONFIG.boost.gapPoints : 1;
+        hud.setScore(score, true, boosted ? 'double' : 'normal');
+        passBurst(hit.obstacle, boosted);
+      }
       setZone(rings);
     }
   }
@@ -494,7 +524,7 @@ function frame(now: number): void {
   if (state !== 'dead') emitTrail(dt);
 
   if (mode === 'tunnel') {
-    if (pads.update(dt, ship.position, state === 'playing')) padBoost();
+    if (pads.update(dt, ship.position, state === 'playing')) autoBoost();
     const next = obstacles.nextAhead(ship.position.z);
     ship.dimForWall(next ? ship.position.z - (next.z + CONFIG.obstacles.thickness / 2) : null);
     obstacles.update(dt, ship.position.z);

@@ -123,15 +123,17 @@ export class Hud {
     this.qualityBtn.textContent = q === 'high' ? 'HI' : 'LO';
   }
 
-  /** `double`: the points came from a boosted pass, so the bump is bigger and violet. */
-  setScore(n: number, bump = false, double = false): void {
+  /**
+   * `style`: 'double' for a boosted pass (bigger, violet), 'bonus' for a bonus gap (biggest, gold).
+   */
+  setScore(n: number, bump = false, style: 'normal' | 'double' | 'bonus' = 'normal'): void {
     this.scoreEl.textContent = String(n);
     if (bump) {
-      const cls = double ? 'bump-double' : 'bump';
-      this.scoreEl.classList.remove('bump', 'bump-double');
+      const cls = style === 'normal' ? 'bump' : `bump-${style}`;
+      this.scoreEl.classList.remove('bump', 'bump-double', 'bump-bonus');
       void this.scoreEl.offsetWidth;
       this.scoreEl.classList.add(cls);
-      setTimeout(() => this.scoreEl.classList.remove(cls), double ? 260 : 120);
+      setTimeout(() => this.scoreEl.classList.remove(cls), style === 'normal' ? 120 : style === 'double' ? 260 : 420);
     }
   }
 
