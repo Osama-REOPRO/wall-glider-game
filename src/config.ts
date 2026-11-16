@@ -67,7 +67,7 @@ export const CONFIG = {
     /** Roll + pitch: radians of roll per screen-width of sideways finger travel. */
     rollSensitivity: 3.2,
     /** How much the tunnel camera rolls with the ship in roll + pitch (0 = level, 1 = fully). */
-    cameraRollFollow: 0.85,
+    cameraRollFollow: 1,
   },
   /** Flight aids: cues that make depth readable from the chase camera. Each can be toggled in the Aids panel. */
   aids: {
@@ -105,6 +105,10 @@ export const CONFIG = {
     /** Seconds to reach full boost, and to wind back down after it ends. */
     rampUp: 0.12,
     rampDown: 0.4,
+    /** Steering stays fully reduced for this long after a boost ends... */
+    steerHoldAfter: 0.6,
+    /** ...then eases back to normal over this many seconds (speed is back long before). */
+    steerRecover: 1.2,
     /** Free flight has no walls, so a boost there lasts this far. */
     freeFlightDistance: 100,
     /** Extra field of view (degrees) at full boost. */

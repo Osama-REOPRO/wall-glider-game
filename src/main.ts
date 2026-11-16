@@ -86,6 +86,9 @@ let prediction: Prediction | null = null;
 // Boost: distance left to travel at full boost, the smoothed 0..1 boost level, and time since the run began.
 let boostLeft = 0;
 let boostLevel = 0;
+/** 0..1 how reduced steering is. Recovers on its own, slower and lagged, after a boost ends. */
+let steerLow = 0;
+let steerHold = 0;
 let runTime = 0;
 /** Speed before the boost multiplier (drives the normal speed-based camera widening). */
 let baseSpeed: number = CONFIG.ship.startSpeed;
@@ -142,6 +145,8 @@ function resetWorld(): void {
   timeScale = 1;
   boostLeft = 0;
   boostLevel = 0;
+  steerLow = 0;
+  steerHold = 0;
   runTime = 0;
   input.steerScale = 1;
   ship.boost = 0;
@@ -265,12 +270,18 @@ function updateBoost(dt: number): void {
   if (boostLeft > 0) {
     boostLeft = Math.max(0, boostLeft - ship.speed * dt);
     boostLevel = Math.min(1, boostLevel + dt / B.rampUp);
+    steerLow = Math.min(1, steerLow + dt / B.rampUp);
+    steerHold = B.steerHoldAfter;
   } else {
     boostLevel = Math.max(0, boostLevel - dt / B.rampDown);
+    // Steering lags the speed: hold it low for a moment, then ease it back.
+    if (steerHold > 0) steerHold = Math.max(0, steerHold - dt);
+    else steerLow = Math.max(0, steerLow - dt / B.steerRecover);
   }
   const eased = boostLevel * boostLevel * (3 - 2 * boostLevel);
   ship.speed = baseSpeed * (1 + (B.speedMultiplier - 1) * eased);
-  input.steerScale = 1 + (B.steerScale - 1) * eased;
+  const steerEased = steerLow * steerLow * (3 - 2 * steerLow);
+  input.steerScale = 1 + (B.steerScale - 1) * steerEased;
   ship.boost = eased;
 }
 
@@ -469,11 +480,23 @@ function updateCamera(dt: number, realDt: number): void {
   const C = CONFIG.camera;
   const f = C.follow;
   const p = ship.position;
-  // Sit behind the ship, pulled toward the tube axis so the way ahead stays readable.
-  tmpA.set(p.x * f, p.y * f + C.height, p.z + C.distance);
-  const R = CONFIG.tube.radius - 1.2;
-  const rad = Math.hypot(tmpA.x, tmpA.y);
-  if (rad > R) tmpA.multiplyScalar(R / rad).setZ(p.z + C.distance);
+  const behind = input.scheme === 'rollpitch' && state !== 'title';
+  if (behind) {
+    // Roll + pitch: directly behind the ship and above its own wings, a rigid chase camera.
+    tmpA.copy(p).addScaledVector(ship.direction, -C.distance).addScaledVector(ship.up, C.height);
+    const maxR = CONFIG.tube.radius - 0.6;
+    const r = Math.hypot(tmpA.x, tmpA.y);
+    if (r > maxR) {
+      tmpA.x *= maxR / r;
+      tmpA.y *= maxR / r;
+    }
+  } else {
+    // Sit behind the ship, pulled toward the tube axis so the way ahead stays readable.
+    tmpA.set(p.x * f, p.y * f + C.height, p.z + C.distance);
+    const R = CONFIG.tube.radius - 1.2;
+    const rad = Math.hypot(tmpA.x, tmpA.y);
+    if (rad > R) tmpA.multiplyScalar(R / rad).setZ(p.z + C.distance);
+  }
 
   const k = state === 'dead' ? 1 - Math.exp(-2 * dt) : 1 - Math.exp(-9 * dt);
   camPos.lerp(tmpA, k);
@@ -634,7 +657,7 @@ requestAnimationFrame(frame);
   boost: tryBoost,
   pads,
   get boostState() {
-    return { left: boostLeft, level: boostLevel, steerScale: input.steerScale, speed: ship.speed, base: baseSpeed };
+    return { left: boostLeft, level: boostLevel, hold: steerHold, steerScale: input.steerScale, speed: ship.speed, base: baseSpeed };
   },
   pause: (on: boolean) => {
     paused = on;
