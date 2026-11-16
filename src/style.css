@@ -82,6 +82,9 @@ html, body {
 
 #aids-panel {
   pointer-events: auto;
+  max-width: min(300px, calc(100vw - 32px));
+  max-height: calc(100vh - 80px - env(safe-area-inset-top, 0px));
+  overflow-y: auto;
   position: absolute;
   top: calc(env(safe-area-inset-top, 0px) + 54px);
   right: max(16px, env(safe-area-inset-right, 0px));
@@ -127,6 +130,7 @@ html, body {
   margin: 0;
   accent-color: var(--accent);
 }
+#aids-panel input[type="radio"],
 #aids-panel input[type="checkbox"] {
   width: 20px;
   height: 20px;

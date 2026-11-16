@@ -50,6 +50,7 @@ export class Hud {
   private aidsPanel = document.getElementById('aids-panel')!;
 
   onQualityChange: ((q: Quality) => void) | null = null;
+  onControlsChange: (() => void) | null = null;
   onTunnel: (() => void) | null = null;
   onFree: (() => void) | null = null;
   onExit: (() => void) | null = null;
@@ -91,6 +92,18 @@ export class Hud {
       box.addEventListener('change', () => {
         this.aids[key] = box.checked;
         writeStorage(AIDS_KEY, JSON.stringify(this.aids));
+      });
+    }
+
+    // Control scheme radios.
+    for (const scheme of ['steer', 'rollpitch'] as const) {
+      const radio = document.getElementById(`ctl-${scheme}`) as HTMLInputElement;
+      radio.checked = this.aids.controls === scheme;
+      radio.addEventListener('change', () => {
+        if (!radio.checked) return;
+        this.aids.controls = scheme;
+        writeStorage(AIDS_KEY, JSON.stringify(this.aids));
+        this.onControlsChange?.();
       });
     }
 

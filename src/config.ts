@@ -62,6 +62,13 @@ export const CONFIG = {
     /** How far ahead of the ship the camera aims. */
     lookAhead: 32,
   },
+  /** Control schemes (chosen in the Aids panel's Controls section). */
+  controls: {
+    /** Roll + pitch: radians of roll per screen-width of sideways finger travel. */
+    rollSensitivity: 3.2,
+    /** How much the tunnel camera rolls with the ship in roll + pitch (0 = level, 1 = fully). */
+    cameraRollFollow: 0.85,
+  },
   /** Flight aids: cues that make depth readable from the chase camera. Each can be toggled in the Aids panel. */
   aids: {
     /** Collision radius multiplier when the forgiving hitbox is on. */

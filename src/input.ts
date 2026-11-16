@@ -1,4 +1,20 @@
+import * as THREE from 'three';
 import { CONFIG } from './config';
+
+/**
+ * 'steer': drag moves the nose directly (sideways = yaw, up/down = pitch).
+ * 'rollpitch': sideways rolls the ship around its nose, up/down pitches it relative to its own wings,
+ * like a plane: roll first, then pull up to turn in that direction.
+ */
+export type ControlScheme = 'steer' | 'rollpitch';
+
+const AXIS_X = new THREE.Vector3(1, 0, 0);
+const AXIS_Z = new THREE.Vector3(0, 0, 1);
+const FORWARD = new THREE.Vector3(0, 0, -1);
+const qStep = new THREE.Quaternion();
+const qFix = new THREE.Quaternion();
+const vDir = new THREE.Vector3();
+const vClamped = new THREE.Vector3();
 
 /**
  * Converts finger/mouse drags into heading changes.
@@ -6,9 +22,12 @@ import { CONFIG } from './config';
  * The heading is held when the finger lifts (the player only controls direction).
  */
 export class SteerInput {
-  /** Accumulated target heading in radians. */
+  /** Accumulated target heading in radians (steer scheme). */
   yaw = 0;
   pitch = 0;
+  /** Target orientation (roll + pitch scheme). */
+  readonly target = new THREE.Quaternion();
+  scheme: ControlScheme = 'steer';
   /** Fires on any tap/press (used for start/restart). */
   onPress: (() => void) | null = null;
   /** Fires on a quick double tap (two short taps close together in time and place). */
@@ -58,9 +77,7 @@ export class SteerInput {
       this.travel += Math.hypot(dx, dy);
       if (!this.enabled) return;
       const scale = (CONFIG.ship.steerSensitivity * this.steerScale) / Math.min(window.innerWidth, window.innerHeight);
-      this.yaw += dx * scale;
-      this.pitch -= dy * scale;
-      this.clamp();
+      this.apply(dx * scale, -dy * scale);
       e.preventDefault();
     });
     const end = (e: PointerEvent) => {
@@ -79,11 +96,13 @@ export class SteerInput {
       if (e.code === 'ShiftLeft' || e.code === 'ShiftRight' || e.code === 'KeyB') this.onDoubleTap?.();
       if (!this.enabled) return;
       const step = 0.06 * this.steerScale;
-      if (e.code === 'ArrowLeft' || e.code === 'KeyA') this.yaw -= step;
-      if (e.code === 'ArrowRight' || e.code === 'KeyD') this.yaw += step;
-      if (e.code === 'ArrowUp' || e.code === 'KeyW') this.pitch += step;
-      if (e.code === 'ArrowDown' || e.code === 'KeyS') this.pitch -= step;
-      this.clamp();
+      let sx = 0;
+      let sy = 0;
+      if (e.code === 'ArrowLeft' || e.code === 'KeyA') sx -= step;
+      if (e.code === 'ArrowRight' || e.code === 'KeyD') sx += step;
+      if (e.code === 'ArrowUp' || e.code === 'KeyW') sy += step;
+      if (e.code === 'ArrowDown' || e.code === 'KeyS') sy -= step;
+      this.apply(sx, sy);
     });
   }
 
@@ -110,9 +129,55 @@ export class SteerInput {
     this.lastTapY = y;
   }
 
+  /**
+   * One steering input: `sx` from sideways movement, `sy` from vertical (up is positive), in radians.
+   */
+  private apply(sx: number, sy: number): void {
+    if (this.scheme === 'steer') {
+      this.yaw += sx;
+      this.pitch += sy;
+      this.clamp();
+      return;
+    }
+    // Roll + pitch, both about the ship's own axes. Sliding right rolls right (right wing down).
+    const rollScale = CONFIG.controls.rollSensitivity / CONFIG.ship.steerSensitivity;
+    this.target.multiply(qStep.setFromAxisAngle(AXIS_Z, -sx * rollScale));
+    this.target.multiply(qStep.setFromAxisAngle(AXIS_X, sy));
+    this.target.normalize();
+    if (this.limits === 'cone') this.clampOrientation();
+  }
+
+  /** Tunnel: if the nose has left the cone, rotate it back onto the cone's edge, keeping the roll. */
+  private clampOrientation(): void {
+    const max = CONFIG.ship.maxAngle;
+    vDir.copy(FORWARD).applyQuaternion(this.target);
+    const angle = vDir.angleTo(FORWARD);
+    if (angle <= max) return;
+    // The point on the cone's edge in the same direction around the axis.
+    const lateral = Math.hypot(vDir.x, vDir.y) || 1;
+    vClamped.set((vDir.x / lateral) * Math.sin(max), (vDir.y / lateral) * Math.sin(max), -Math.cos(max));
+    this.target.premultiply(qFix.setFromUnitVectors(vDir, vClamped));
+  }
+
+  /** Switch scheme, carrying over the current heading so the ship doesn't jump. */
+  setScheme(scheme: ControlScheme, orientation: THREE.Quaternion, yaw: number, pitch: number): void {
+    this.scheme = scheme;
+    this.target.copy(orientation);
+    this.yaw = yaw;
+    this.pitch = pitch;
+  }
+
+  /** Where the player is steering to: the nose direction of the target heading. */
+  targetDirection(out: THREE.Vector3): THREE.Vector3 {
+    if (this.scheme === 'rollpitch') return out.copy(FORWARD).applyQuaternion(this.target);
+    const cp = Math.cos(this.pitch);
+    return out.set(Math.sin(this.yaw) * cp, Math.sin(this.pitch), -Math.cos(this.yaw) * cp);
+  }
+
   reset(): void {
     this.yaw = 0;
     this.pitch = 0;
+    this.target.identity();
   }
 
   /** Keep the heading inside the current limits. */

@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { CONFIG } from './config';
 import { createGlowTexture } from './textures';
 
+const tmpRight = new THREE.Vector3();
+
 /** The player's triangular ship and its flight model. */
 export class Ship {
   readonly group = new THREE.Group();
@@ -28,6 +30,15 @@ export class Ship {
   private roll = 0;
   /** Tunnel mode adds extra bank from the heading's offset to the tube axis. Off in free flight. */
   axisBank = true;
+  /**
+   * Full orientation, used by the roll + pitch control scheme (the steer scheme derives it from
+   * yaw/pitch). Forward is −Z and up is +Y in the ship's own frame.
+   */
+  readonly orientation = new THREE.Quaternion();
+  /** The ship's up vector in world space. */
+  readonly up = new THREE.Vector3(0, 1, 0);
+  /** True while flying with the roll + pitch scheme. */
+  private oriented = false;
   private time = 0;
 
   constructor() {
@@ -127,9 +138,11 @@ export class Ship {
     this.light.intensity = this.lightIntensity * Math.min(1, Math.pow(lightToWall / SAFE, 1.5));
   }
 
-  /** Current visual bank angle (radians). */
+  /** Current visual bank angle (radians): the roll of the wings as seen down the tunnel. */
   get bank(): number {
-    return this.roll;
+    if (!this.oriented) return this.roll;
+    const right = tmpRight.set(1, 0, 0).applyQuaternion(this.orientation);
+    return Math.atan2(right.y, right.x);
   }
 
   reset(): void {
@@ -137,6 +150,9 @@ export class Ship {
     this.prevPosition.copy(this.position);
     this.speed = CONFIG.ship.startSpeed;
     this.yaw = this.pitch = this.roll = 0;
+    this.orientation.identity();
+    this.up.set(0, 1, 0);
+    this.oriented = false;
     this.group.visible = true;
     this.sync();
   }
@@ -156,10 +172,38 @@ export class Ship {
 
     const cp = Math.cos(this.pitch);
     this.direction.set(Math.sin(this.yaw) * cp, Math.sin(this.pitch), -Math.cos(this.yaw) * cp);
+    this.oriented = false;
+    this.sync();
+    this.orientation.copy(this.group.quaternion); // so a switch to roll + pitch starts from here
+    this.up.set(0, 1, 0).applyQuaternion(this.orientation);
+    this.advance(dt);
+  }
 
+  /**
+   * Roll + pitch scheme: ease the full orientation toward the target and fly along the nose.
+   * There's no automatic banking: the roll is the player's.
+   */
+  updateOriented(dt: number, target: THREE.Quaternion): void {
+    this.time += dt;
+    this.orientation.slerp(target, 1 - Math.exp(-CONFIG.ship.steerSmoothing * dt));
+    this.direction.set(0, 0, -1).applyQuaternion(this.orientation);
+    this.up.set(0, 1, 0).applyQuaternion(this.orientation);
+    // Keep yaw/pitch meaningful (readout, camera) and roll at the true bank.
+    this.yaw = Math.atan2(this.direction.x, -this.direction.z);
+    this.pitch = Math.asin(THREE.MathUtils.clamp(this.direction.y, -1, 1));
+    this.oriented = true;
+    this.roll = this.bank;
+    this.group.position.copy(this.position);
+    this.group.quaternion.copy(this.orientation);
+    this.body.rotation.set(0, 0, 0);
+    this.advance(dt);
+  }
+
+  /** Move along the heading and animate the engine. */
+  private advance(dt: number): void {
     this.prevPosition.copy(this.position);
     this.position.addScaledVector(this.direction, this.speed * dt);
-    this.sync();
+    this.group.position.copy(this.position);
 
     // Engine flicker.
     const f = 1 + Math.sin(this.time * 60) * 0.08 + Math.sin(this.time * 23) * 0.06;

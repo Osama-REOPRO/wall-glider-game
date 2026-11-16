@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { CONFIG } from './config';
 import { BEVEL } from './collision';
 import type { Obstacle, Obstacles } from './obstacles';
+import type { ControlScheme } from './input';
 
 /** Which flight aids are switched on (each is toggled separately in the Aids panel). */
 export interface AidSettings {
@@ -23,6 +24,8 @@ export interface AidSettings {
   forgiving: boolean;
   /** Distance from the wall (world units) at which the shadow starts to appear. */
   shadowDistance: number;
+  /** Control scheme (stored with the aids so all panel settings persist together). */
+  controls: ControlScheme;
 }
 
 /** The on/off aids (everything except numeric settings). */
@@ -40,6 +43,7 @@ export const DEFAULT_AIDS: AidSettings = {
   markers: false,
   forgiving: true,
   shadowDistance: CONFIG.aids.shadowDistance,
+  controls: 'steer',
 };
 
 export interface Prediction {
@@ -63,22 +67,20 @@ const dir = new THREE.Vector3();
 const point = new THREE.Vector3();
 
 /**
- * Predict where the ship crosses the next wall if it holds the given heading.
+ * Predict where the ship crosses the next wall if it holds the given heading (a direction vector).
  * It uses the same gap test (and margin) as the collision check, so the cues can't disagree with it.
  * For a spinning slot it tests the rotation the slot will have when the ship arrives.
  */
 export function predict(
   shipPos: THREE.Vector3,
-  yaw: number,
-  pitch: number,
+  heading: THREE.Vector3,
   speed: number,
   obstacles: Obstacles,
   radius: number,
 ): Prediction | null {
   const o = obstacles.nextAhead(shipPos.z);
   if (!o) return null;
-  const cp = Math.cos(pitch);
-  dir.set(Math.sin(yaw) * cp, Math.sin(pitch), -Math.cos(yaw) * cp);
+  dir.copy(heading).normalize();
   if (dir.z > -0.01) return null;
 
   const faceZ = o.z + CONFIG.obstacles.thickness / 2 + BEVEL;

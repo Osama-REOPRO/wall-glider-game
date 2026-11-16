@@ -171,6 +171,7 @@ function setMode(m: Mode): void {
 function startGame(): void {
   setMode('tunnel');
   resetWorld();
+  applyControls();
   state = 'playing';
   input.enabled = true;
   hud.showRun();
@@ -180,6 +181,7 @@ function startFreeFlight(): void {
   setMode('free');
   resetWorld();
   ship.speed = CONFIG.space.speed;
+  applyControls();
   state = 'playing';
   input.enabled = true;
   hud.showFreeFlight();
@@ -273,6 +275,7 @@ function updateBoost(dt: number): void {
 }
 
 input.onDoubleTap = tryBoost;
+hud.onControlsChange = applyControls;
 
 input.onPress = () => {
   if (mode === 'free') return;
@@ -333,9 +336,9 @@ function passBurst(o: (typeof obstacles.items)[number], boosted = false): void {
  * Flight aids: predict where the ship crosses the next wall at the heading it's steering to,
  * then drive the projected shadow and the rim warning from that one prediction.
  */
-function updateAids(yaw: number, pitch: number): void {
+function updateAids(heading: THREE.Vector3): void {
   const radius = hitRadius(hud.aids);
-  prediction = predict(ship.position, yaw, pitch, ship.speed, obstacles, radius);
+  prediction = predict(ship.position, heading, ship.speed, obstacles, radius);
   for (const o of obstacles.items) o.warn = 0;
   if (!prediction) {
     shadow.hide();
@@ -379,6 +382,28 @@ function bonusBurst(o: (typeof obstacles.items)[number]): void {
   }
 }
 
+const aimDir = new THREE.Vector3();
+/** Smoothed camera up vector (rolls with the ship in the roll + pitch scheme). */
+const camUp = new THREE.Vector3(0, 1, 0);
+const WORLD_UP = new THREE.Vector3(0, 1, 0);
+
+/** Fly the player's ship with the chosen control scheme. */
+function fly(dt: number): void {
+  if (input.scheme === 'rollpitch') ship.updateOriented(dt, input.target);
+  else ship.update(dt, input.yaw, input.pitch);
+}
+
+/** Ease the camera's up vector toward `target`. */
+function easeCamUp(target: THREE.Vector3, dt: number): void {
+  camUp.lerp(target, 1 - Math.exp(-8 * dt)).normalize();
+  camera.up.copy(camUp);
+}
+
+/** Switch control scheme, carrying the current heading over. */
+function applyControls(): void {
+  input.setScheme(hud.aids.controls, ship.orientation, ship.yaw, ship.pitch);
+}
+
 /** Attract mode: steer toward the next gap so the title screen shows the game being played. */
 function autopilot(): [number, number] {
   const next = obstacles.nextAhead(ship.position.z);
@@ -395,9 +420,12 @@ function autopilot(): [number, number] {
 function updateFreeCamera(dt: number, realDt: number): void {
   const C = CONFIG.camera;
   const p = ship.position;
-  tmpA.copy(p).addScaledVector(ship.direction, -C.distance);
-  tmpA.y += C.height;
+  // Roll + pitch: the camera rides with the ship (above its own wings), so loops work.
+  const rolling = input.scheme === 'rollpitch' && state === 'playing';
+  const up = rolling ? ship.up : WORLD_UP;
+  tmpA.copy(p).addScaledVector(ship.direction, -C.distance).addScaledVector(up, C.height);
   tmpB.copy(p).addScaledVector(ship.direction, C.lookAhead * 0.5);
+  easeCamUp(up, dt);
   camPos.lerp(tmpA, 1 - Math.exp(-9 * dt));
   camLook.lerp(tmpB, 1 - Math.exp(-12 * dt));
   camera.position.copy(camPos);
@@ -446,9 +474,16 @@ function updateCamera(dt: number, realDt: number): void {
   camLook.lerp(tmpB, 1 - Math.exp(-12 * dt));
   camera.position.copy(camPos);
   applyShake(realDt);
-  camera.lookAt(camLook);
-  // Roll the camera slightly with the ship's turn for extra motion feel.
-  camera.rotateZ(-ship.yaw * 0.25);
+  if (input.scheme === 'rollpitch' && state !== 'title') {
+    // Roll + pitch: the camera rolls with the ship, so "up" on screen is always the ship's up.
+    easeCamUp(tmpC.copy(WORLD_UP).lerp(ship.up, CONFIG.controls.cameraRollFollow).normalize(), dt);
+    camera.lookAt(camLook);
+  } else {
+    easeCamUp(WORLD_UP, dt);
+    camera.lookAt(camLook);
+    // Roll the camera slightly with the ship's turn for extra motion feel.
+    camera.rotateZ(-ship.yaw * 0.25);
+  }
 
 }
 
@@ -484,18 +519,19 @@ function frame(now: number): void {
   if (mode === 'free') {
     baseSpeed = CONFIG.space.speed;
     updateBoost(dt);
-    ship.update(dt, input.yaw, input.pitch); // no collisions in free flight
+    fly(dt); // no collisions in free flight
     updateReadout(realDt);
   } else if (state === 'title') {
     const [yaw, pitch] = autopilot();
     ship.speed = CONFIG.ship.startSpeed * 0.8;
-    ship.update(dt, yaw, pitch); // attract mode: no collisions
-    updateAids(yaw, pitch);
+    ship.update(dt, yaw, pitch); // attract mode: always the steer scheme, no collisions
+    const cp = Math.cos(pitch);
+    updateAids(aimDir.set(Math.sin(yaw) * cp, Math.sin(pitch), -Math.cos(yaw) * cp));
   } else if (state === 'playing') {
     baseSpeed = Math.min(CONFIG.ship.maxSpeed, CONFIG.ship.startSpeed + rings * CONFIG.ship.speedPerRing);
     updateBoost(dt);
-    ship.update(dt, input.yaw, input.pitch);
-    updateAids(input.yaw, input.pitch);
+    fly(dt);
+    updateAids(input.targetDirection(aimDir));
     const hit = checkCollision(ship.prevPosition, ship.position, obstacles.items, hitRadius(hud.aids));
     if (hit.type === 'wall' || hit.type === 'obstacle') {
       crash(hit.point);

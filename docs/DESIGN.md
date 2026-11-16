@@ -40,6 +40,21 @@ A small triangular ship flies forward on its own down an endless tunnel. The pla
 - Arrow keys/WASD and Space work on desktop for testing. Keys aimed at a focused button or checkbox are ignored by the game.
 - Open question: whether the heading should drift back to centre when the finger lifts.
 
+### Control schemes
+
+The designer is exploring alternatives. The scheme is chosen in the **Controls** section at the top of the Aids panel, can be switched mid-run without the heading jumping, and is saved per browser.
+
+| Scheme | Sideways drag | Vertical drag |
+|---|---|---|
+| **Steer** (default, the original) | Turns the nose left/right (yaw) | Turns the nose up/down (pitch) |
+| **Roll + pitch** | Rolls the ship around its nose (sliding right rolls right) | Pitches up/down relative to the ship's own wings |
+
+- **Roll + pitch flies like a plane:** to turn right, roll right, then pull up. Sliding sideways alone never changes where the ship is going; only pitch does. Both rotations are about the ship's own axes, so the orientation is a full quaternion (no gimbal lock, and loops work in free flight).
+- **Roll sensitivity** is set separately (`controls.rollSensitivity`, 3.2 rad per screen width): a quarter-width slide rolls about 45°. Pitch uses the normal steering sensitivity. Boost cuts both.
+- **The camera rolls with the ship.** In the tunnel it follows 85% of the roll (`cameraRollFollow`), so "pull up" always means up on screen and the tunnel turns around you. In free flight it rides fully behind and above the ship's own wings.
+- **The tunnel's 31.5° cone limit still applies.** If a pitch would take the nose outside the cone, the nose is moved back onto the cone's edge and the roll is kept.
+- **Shared parts:** the flight aids predict along the target heading in either scheme, and the shadow turns with the real bank angle. The title-screen autopilot always uses the steer scheme.
+
 ## Boost
 
 A risk/reward move for advanced players who want to go faster, asked for by the designer.
