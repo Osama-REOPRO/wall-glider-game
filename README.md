@@ -23,7 +23,7 @@ npm run build      # typecheck + production build into dist/
 npm run preview    # serve dist/
 ```
 
-Desktop testing: drag with the mouse, or use the arrow keys / WASD. Space starts or restarts.
+On a desktop browser: hold the arrow keys or WASD to steer (or drag with the mouse), Space to start or retry, Shift to boost, Escape for the menu.
 
 ## Deploy (phone testing by URL)
 

@@ -8,6 +8,7 @@ import { CONFIG } from './config';
  */
 export type ControlScheme = 'steer' | 'rollpitch';
 
+const STEER_KEYS = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'KeyA', 'KeyD', 'KeyW', 'KeyS']);
 const AXIS_X = new THREE.Vector3(1, 0, 0);
 const AXIS_Z = new THREE.Vector3(0, 0, 1);
 const FORWARD = new THREE.Vector3(0, 0, -1);
@@ -88,22 +89,54 @@ export class SteerInput {
       end(e);
     });
     target.addEventListener('pointercancel', end);
-    // Keyboard fallback for desktop testing.
+    // Keyboard (desktop browsers): steering keys are held and applied every frame in `update()`.
     window.addEventListener('keydown', (e) => {
-      // Keys aimed at a focused button or checkbox belong to it, not to the game.
+      // Keys aimed at a focused button, slider or checkbox belong to it, not to the game.
       if (e.target instanceof HTMLElement && e.target.closest('button, input, label')) return;
-      if (e.code === 'Space' || e.code === 'Enter') this.onPress?.();
+      if (STEER_KEYS.has(e.code)) {
+        this.held.add(e.code);
+        e.preventDefault(); // arrows would scroll the page
+        return;
+      }
+      if (e.repeat) return;
+      if (e.code === 'Space' || e.code === 'Enter') {
+        this.onPress?.();
+        e.preventDefault();
+      }
       if (e.code === 'ShiftLeft' || e.code === 'ShiftRight' || e.code === 'KeyB') this.onDoubleTap?.();
-      if (!this.enabled) return;
-      const step = 0.06 * this.steerScale;
-      let sx = 0;
-      let sy = 0;
-      if (e.code === 'ArrowLeft' || e.code === 'KeyA') sx -= step;
-      if (e.code === 'ArrowRight' || e.code === 'KeyD') sx += step;
-      if (e.code === 'ArrowUp' || e.code === 'KeyW') sy += step;
-      if (e.code === 'ArrowDown' || e.code === 'KeyS') sy -= step;
-      this.apply(sx, sy);
+      if (e.code === 'Escape') this.onEscape?.();
     });
+    window.addEventListener('keyup', (e) => this.held.delete(e.code));
+    // Don't leave a key "stuck" down if the window loses focus mid-press.
+    window.addEventListener('blur', () => this.held.clear());
+  }
+
+  /** Fires on Escape (back to the menu). */
+  onEscape: (() => void) | null = null;
+  private held = new Set<string>();
+
+  /** True if the device looks like a desktop (mouse/trackpad, no touch as the main input). */
+  static isDesktop(): boolean {
+    try {
+      return window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Apply held steering keys. Holding a key turns at a steady rate (radians per second), scaled like
+   * finger steering (boost cuts it too). In roll + pitch, left/right roll and up/down pitch.
+   */
+  update(dt: number): void {
+    if (!this.enabled || this.held.size === 0) return;
+    const k = CONFIG.controls.keyboard;
+    const h = this.held;
+    const x = (h.has('ArrowRight') || h.has('KeyD') ? 1 : 0) - (h.has('ArrowLeft') || h.has('KeyA') ? 1 : 0);
+    const y = (h.has('ArrowUp') || h.has('KeyW') ? 1 : 0) - (h.has('ArrowDown') || h.has('KeyS') ? 1 : 0);
+    if (x === 0 && y === 0) return;
+    // `apply` scales sideways input into roll itself in roll + pitch, so feed both axes at the steer rate.
+    this.apply(x * k.steerRate * this.steerScale * dt, y * k.steerRate * this.steerScale * dt);
   }
 
   /**

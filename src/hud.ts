@@ -1,6 +1,7 @@
 import type { Quality } from './renderer';
 import { DEFAULT_AIDS, type AidSettings, type AidToggle } from './aids';
 import { CONFIG } from './config';
+import { SteerInput } from './input';
 
 const BEST_KEY = 'wall-glider.best';
 const QUALITY_KEY = 'wall-glider.quality';
@@ -157,8 +158,13 @@ export class Hud {
 
   showTitle(): void {
     this.title.textContent = 'WALL GLIDER';
-    this.sub.textContent = 'Drag to steer. Fly through the gaps. Double-tap to boost.';
-    this.cta.textContent = 'Tap to start';
+    if (SteerInput.isDesktop()) {
+      this.sub.textContent = 'Arrow keys or WASD (or drag) to steer. Shift to boost. Esc for the menu.';
+      this.cta.textContent = 'Press Space to start';
+    } else {
+      this.sub.textContent = 'Drag to steer. Fly through the gaps. Double-tap to boost.';
+      this.cta.textContent = 'Tap to start';
+    }
     this.overlay.classList.add('visible');
     this.showScore(false);
     this.setFreeFlight(false);
@@ -173,7 +179,7 @@ export class Hud {
     }
     this.title.textContent = isBest && score > 0 ? 'NEW BEST' : 'CRASHED';
     this.sub.textContent = `Score ${score}  ·  Best ${this.best}`;
-    this.cta.textContent = 'Tap to retry';
+    this.cta.textContent = SteerInput.isDesktop() ? 'Press Space to retry' : 'Tap to retry';
     this.overlay.classList.add('visible');
   }
 

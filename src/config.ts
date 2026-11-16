@@ -68,6 +68,8 @@ export const CONFIG = {
     rollSensitivity: 3.2,
     /** How much the tunnel camera rolls with the ship in roll + pitch (0 = level, 1 = fully). */
     cameraRollFollow: 1,
+    /** Keyboard (desktop): holding a steering key turns at this many radians per second. */
+    keyboard: { steerRate: 1.1 },
   },
   /** Flight aids: cues that make depth readable from the chase camera. Each can be toggled in the Aids panel. */
   aids: {

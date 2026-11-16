@@ -37,7 +37,7 @@ A small triangular ship flies forward on its own down an endless tunnel. The pla
 - **Free flight: yaw is unlimited and pitch is capped at 1.4 rad (~80°).** Capping just short of vertical avoids the camera and the yaw/pitch maths flipping over.
 - The heading is **smoothed** toward the target (`steerSmoothing`) so it doesn't jitter.
 - **The ship banks into turns**, which tells the player what the ship is doing. In the tunnel it also banks with its offset from the axis; that's turned off in free flight, where yaw has no limit.
-- Arrow keys/WASD and Space work on desktop for testing. Keys aimed at a focused button or checkbox are ignored by the game.
+- **Keyboard controls for desktop browsers.** Arrow keys or WASD steer while held, at a steady 1.1 rad/s (`controls.keyboard.steerRate`), scaled by boost like finger steering. In roll + pitch, left/right roll and up/down pitch. Space or Enter starts and retries, Shift or B boosts, and Escape goes back to the menu. Releasing a key holds the heading, the same as lifting a finger. Keys are cleared if the window loses focus, and keys aimed at a focused button or checkbox are left to it. On a desktop (mouse/trackpad as the main pointer) the title screen shows the keyboard controls instead of the touch ones. The mouse still drags to steer.
 - Open question: whether the heading should drift back to centre when the finger lifts.
 
 ### Control schemes

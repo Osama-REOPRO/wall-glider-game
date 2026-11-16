@@ -203,6 +203,9 @@ function toMenu(): void {
 hud.onTunnel = startGame;
 hud.onFree = startFreeFlight;
 hud.onExit = toMenu;
+input.onEscape = () => {
+  if (state !== 'title') toMenu();
+};
 
 function crash(point: THREE.Vector3): void {
   state = 'dead';
@@ -543,6 +546,7 @@ function frame(now: number): void {
     if (deadTime > 0.9 && deadTime - realDt <= 0.9) hud.showGameOver(score);
   }
   const dt = paused ? 0 : realDt * timeScale;
+  input.update(dt);
 
   if (state === 'playing') runTime += dt;
   if (mode === 'free') {
