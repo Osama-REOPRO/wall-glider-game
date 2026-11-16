@@ -1,14 +1,14 @@
 /** Tunable game constants. Everything that affects feel lives here. */
 export const CONFIG = {
   tube: {
-    radius: 16,
+    radius: 32, // doubled from 16
     /** World length of one texture panel; the tube mesh snaps by this so the texture looks static. */
     panelLength: 8,
     /** Visible length of the tube mesh ahead of the ship. */
     length: 560,
-    radialSegments: 96,
+    radialSegments: 160,
     /** Hull panels around the circumference (must be even: the texture holds 2×2 panels). */
-    panelsAround: 32,
+    panelsAround: 64, // doubled with the radius, so each panel keeps its size
   },
   ship: {
     /** Visual scale of the ship model (1 = original size). */
@@ -133,7 +133,7 @@ export const CONFIG = {
     chance: 0.4,
     /** Length along the tunnel, and angular width (radians) of each pad. */
     length: 16,
-    arc: 0.42,
+    arc: 0.21, // halved with the doubled radius, so pads keep their width
     /** Trigger when the ship's centre is within this distance of the tunnel wall... */
     triggerDistance: 3.2,
     /** ...and within this many units beyond the pad's side edges. */
@@ -161,7 +161,7 @@ export const CONFIG = {
     max: 2400,
     /** How far ahead the dust motes reach. */
     dustDepth: 420,
-    dustCount: 700,
+    dustCount: 1800, // more motes for the bigger cross-section
     trailRate: 160,
   },
 } as const;

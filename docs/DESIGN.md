@@ -106,6 +106,9 @@ A risk/reward move for advanced players who want to go faster, asked for by the 
 The user asked for a bigger world and a smaller ship ("like Stardew Valley"). We read that as **a tiny ship in a vast space**, but what the reference meant is still an open question. The changes:
 
 - **World:** tunnel radius 6 → 16, with 32 hull panels around instead of 12. Small panels on a big surface make the size readable.
+- **Later doubled again** at the designer's request: radius 16 → 32, with 64 panels around, so each panel stays the same size. Boost pads keep the same physical width, and the tunnel dust count was raised for the bigger cross-section.
+  - **Gaps, the bonus gap and the ship are unchanged**, so each wall is now a much bigger surface with a relatively smaller opening, and gaps can sit up to about 25 units off centre.
+  - Consecutive gaps are still capped at 30% of the wall spacing apart, so the next one stays reachable with the heavier steering.
 - **Ship:** 60% of its former size, with its collision radius scaled to match. The camera sits a little further back, so the ship appears about half its former size on screen.
 - **Retuned for the scale:** speed (30 → 56, later raised to 55 → 104; see Controls), wall spacing, gap sizes, fog, light ranges, and particle sizes.
 
