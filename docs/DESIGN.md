@@ -2,17 +2,6 @@
 
 This file records the design decisions made so far: what we chose, why, and what we turned down. Any change that makes a design decision updates this file in the same commit. Tunable numbers live in `src/config.ts`; this file explains the reasoning behind them.
 
-## Experiment on this branch: boost feel as normal flight
-
-This branch (`claude/experiment-boost-feel`) tries the designer's idea: the way the ship flies while boosting becomes normal flight.
-- **Normal flight is the old full boost:** speed 55 rising to 104 (1.85× the old 30 to 56), steering at 30% of the old sensitivity in both control schemes and on the keyboard, and the old boost's wider view (field of view 86° instead of 70°).
-- **Boost is kept as an extra tier:** 1.4× the new speed, with steering cut to 60% of the new normal (about 18% of the original) and a further 10° of view. Double tap, boost pads and bonus gaps still trigger it.
-- **Only the feel changes:** the nitro flame, speed lines and strong colour fringe still appear only while boosting, so normal flight stays visually calm.
-- **Unchanged:** wall spacing and gap sizes, so every gap arrives sooner and has to be lined up earlier, which is exactly what made boosting feel good.
-- The branch doesn't deploy to GitHub Pages; it's shared as its own Artifact.
-
-The rest of this document describes the main game; values here override the ones below.
-
 ## Guiding principles
 
 ### Keep cues in the world, not in the UI
@@ -43,12 +32,21 @@ A small triangular ship flies forward on its own down an endless tunnel. The pla
 
 ## Controls
 
+### Fast, heavy flight is the normal feel
+
+The designer liked how the ship handled while boosting, so after an experiment on a separate branch that feel became normal flight:
+- **Speed** starts at 55 and rises to 104 (`ship.startSpeed`, `maxSpeed`). That's 1.85× the original 30 to 56.
+- **Steering** is 30% of the original sensitivity: `steerSensitivity` 0.54 (was 1.8), `rollSensitivity` 0.96 (was 3.2), keyboard 0.33 rad/s (was 1.1).
+- **View:** the field of view is 86° (was 70°).
+- **Effects stay calm:** the nitro flame, speed lines and strong colour fringe are still reserved for boosting.
+- **Unchanged:** wall spacing and gap sizes, so gaps arrive sooner and have to be lined up earlier. The game is about choosing your line early, not correcting late.
+
 - **Drag sets the heading, and it holds when you lift your finger.** The brief said the only control is direction. Steering is relative: heading change = finger travel × `steerSensitivity` per screen width.
 - **Tunnel: the heading stays within a cone (0.55 rad) around the tunnel axis**, so the ship can never turn around and fly backwards.
 - **Free flight: yaw is unlimited and pitch is capped at 1.4 rad (~80°).** Capping just short of vertical avoids the camera and the yaw/pitch maths flipping over.
 - The heading is **smoothed** toward the target (`steerSmoothing`) so it doesn't jitter.
 - **The ship banks into turns**, which tells the player what the ship is doing. In the tunnel it also banks with its offset from the axis; that's turned off in free flight, where yaw has no limit.
-- **Keyboard controls for desktop browsers.** Arrow keys or WASD steer while held, at a steady 1.1 rad/s (`controls.keyboard.steerRate`), scaled by boost like finger steering. In roll + pitch, left/right roll and up/down pitch. Space or Enter starts and retries, Shift or B boosts, and Escape goes back to the menu. Releasing a key holds the heading, the same as lifting a finger. Keys are cleared if the window loses focus, and keys aimed at a focused button or checkbox are left to it. On a desktop (mouse/trackpad as the main pointer) the title screen shows the keyboard controls instead of the touch ones. The mouse still drags to steer.
+- **Keyboard controls for desktop browsers.** Arrow keys or WASD steer while held, at a steady 0.33 rad/s (`controls.keyboard.steerRate`), scaled by boost like finger steering. In roll + pitch, left/right roll and up/down pitch. Space or Enter starts and retries, Shift or B boosts, and Escape goes back to the menu. Releasing a key holds the heading, the same as lifting a finger. Keys are cleared if the window loses focus, and keys aimed at a focused button or checkbox are left to it. On a desktop (mouse/trackpad as the main pointer) the title screen shows the keyboard controls instead of the touch ones. The mouse still drags to steer.
 - Open question: whether the heading should drift back to centre when the finger lifts.
 
 ### Control schemes
@@ -61,7 +59,7 @@ The designer is exploring alternatives. The scheme is chosen in the **Controls**
 | **Roll + pitch** | Rolls the ship around its nose (sliding right rolls right) | Pitches up/down relative to the ship's own wings |
 
 - **Roll + pitch flies like a plane:** to turn right, roll right, then pull up. Sliding sideways alone never changes where the ship is going; only pitch does. Both rotations are about the ship's own axes, so the orientation is a full quaternion (no gimbal lock, and loops work in free flight).
-- **Roll sensitivity** is set separately (`controls.rollSensitivity`, 3.2 rad per screen width): a quarter-width slide rolls about 45°. Pitch uses the normal steering sensitivity. Boost cuts both.
+- **Roll sensitivity** is set separately (`controls.rollSensitivity`, 0.96 rad per screen width): a quarter-width slide rolls about 14°. Pitch uses the normal steering sensitivity. Boost cuts both.
 - **The camera sits directly behind the ship and rolls with it** (the designer's call). In both the tunnel and free flight it rides behind the nose and just above the ship's own wings, a rigid chase camera, so "pull up" always means up on screen and the tunnel turns around you. The roll follow is `cameraRollFollow` (1 = fully). In the tunnel it's clamped inside the tunnel wall if the ship hugs the wall with its wings pointing at it. The steer scheme keeps the axis-pulled camera described under Camera.
 - **The tunnel's 31.5° cone limit still applies.** If a pitch would take the nose outside the cone, the nose is moved back onto the cone's edge and the roll is kept.
 - **Shared parts:** the flight aids predict along the target heading in either scheme, and the shadow turns with the real bank angle. The title-screen autopilot always uses the steer scheme.
@@ -70,20 +68,20 @@ The designer is exploring alternatives. The scheme is chosen in the **Controls**
 
 A risk/reward move for advanced players who want to go faster, asked for by the designer.
 
-- **Double tap to boost** ("nitro"). The ship flies **1.85× faster** (`speedMultiplier`) for **one wall's spacing**: the distance from the next wall to the one after it. In free flight, where there are no walls, a boost lasts 100 units. It ramps up in 0.12 s and winds down over 0.4 s.
-- **While boosting, steering drops to 30%** (`steerScale`): the same drag turns the ship much less. **That's the core of the design.** You have to line up with the next gap *before* you boost, because you won't have the manoeuvrability to correct afterwards. Boost rewards planning, not reflexes. Keyboard steering is scaled the same way.
-- **Steering recovers slowly, and lags the speed.** When a boost ends, speed eases back in 0.4 s, but steering stays at 30% for another 0.6 s (`steerHoldAfter`), then eases back to full over 1.2 s (`steerRecover`) on a smoothstep curve. The designer found it jarring when steering snapped back with the speed; this way a freshly unboosted ship still feels heavy for a moment before handling returns, with no step in the controls. A new boost during recovery cuts steering again from wherever it is.
+- **Double tap to boost** ("nitro"). Boost is an extra tier on top of the already fast normal flight. (It used to be 1.85× speed with steering at 30%; that feel became normal flight, see Controls.) The ship flies **1.4× faster** (`speedMultiplier`) for **one wall's spacing**: the distance from the next wall to the one after it. In free flight, where there are no walls, a boost lasts 100 units. It ramps up in 0.12 s and winds down over 0.4 s.
+- **While boosting, steering drops to 60% of normal** (`steerScale`), about 18% of the original sensitivity: the same drag turns the ship much less. **That's the core of the design.** You have to line up with the next gap *before* you boost, because you won't have the manoeuvrability to correct afterwards. Boost rewards planning, not reflexes. Keyboard steering is scaled the same way.
+- **Steering recovers slowly, and lags the speed.** When a boost ends, speed eases back in 0.4 s, but steering stays reduced for another 0.6 s (`steerHoldAfter`), then eases back to full over 1.2 s (`steerRecover`) on a smoothstep curve. The designer found it jarring when steering snapped back with the speed; this way a freshly unboosted ship still feels heavy for a moment before handling returns, with no step in the controls. A new boost during recovery cuts steering again from wherever it is.
 - **Double-tap detection** is kept apart from steering. Each tap must be shorter than 250 ms and move less than 14 px, and the second press must come within 330 ms of the first release and within 70 px of it. A drag never counts as a tap, so steering can't trigger a boost by accident. The tap that starts a run can't pair with a follow-up tap (no boost in the first 0.4 s), and you can't re-trigger a boost while one is running. There's no cooldown: the limit is that a boost commits you to a line.
 - **Effects, all in the world:**
   - **Ignition:** a white-hot burst from the engines, a kick of camera shake, and a short vibration on Android.
   - **Engine and flame:** the engine glow grows, flickers and turns white-violet. The trail becomes a denser, hotter nitro flame.
   - **Speed lines:** thin streaks of light hang in the air along the flight path and rush past. They're kept at least 3.5 units off the flight path; streaks right beside the camera turned into huge white slashes.
-  - **Camera:** the field of view kicks out by 16° (it opens fast and closes slowly), and the colour fringing at the screen edges strengthens. The camera also lags a little further behind at the higher speed, which reads as being pulled back.
+  - **Camera:** the field of view kicks out by 10° (it opens fast and closes slowly), and the colour fringing at the screen edges strengthens. The camera also lags a little further behind at the higher speed, which reads as being pulled back.
 - **Boost pads:** violet panels with chevrons streaming forward, set into the tunnel wall (`src/boostpads.ts`). Fly close over one and the boost **fires automatically**; if you're already boosting, it's **extended by another wall spacing**, so pads can chain. Each pad fires once, then flashes and dims.
   - **Trigger:** the ship's centre must be within 3.2 units of the tunnel wall (`triggerDistance`), inside the pad's length, and over its arc plus a 0.8-unit side margin. The ship's own collision radius is 0.26, so there's a band of about 3 units between "close enough to trigger" and "touching the wall". Flying past a pad in the middle of the tunnel does nothing.
   - **Why violet:** it's the colour of the boost flame, so the pad reads as "boost" at a glance. It's also distinct from every zone colour (cyan, magenta, amber, green tunnel lights; orange, mint, blue, red gap rims). The panel stays mostly below the bloom threshold, so it looks violet rather than blown out to white. A violet point light near the next live pad tints the ship and walls as you pass.
   - **Placement:** from the 4th wall on, with a 40% chance per stretch between walls (`pads` in `src/config.ts`). The pad sits in the middle of the stretch, on the side of the tunnel facing the next wall's gap, with some random spread. That way a line over the pad can carry you on toward the opening, but you have to fly near the wall to take it.
-  - **Risk/reward:** taking a pad means flying close to the tunnel wall, then arriving at the next wall at boost speed with 30% steering. It's an optional line for advanced players, the same idea as the manual boost.
+  - **Risk/reward:** taking a pad means flying close to the tunnel wall, then arriving at the next wall at boost speed with reduced steering. It's an optional line for advanced players, the same idea as the manual boost.
 - **Boosting through a gap scores double** (`gapPoints`: 2 instead of 1), the reward for committing to a line at speed. It counts while the boost is running, or still at least half on as it winds down.
   - The score bump turns violet and bigger, and the pass burst is violet and denser, so a double reads in the world as well as on the counter.
   - **Speed and zone colour are driven by gaps passed, not points.** Otherwise double points would also speed the game up and skip colour zones.
@@ -109,7 +107,7 @@ The user asked for a bigger world and a smaller ship ("like Stardew Valley"). We
 
 - **World:** tunnel radius 6 → 16, with 32 hull panels around instead of 12. Small panels on a big surface make the size readable.
 - **Ship:** 60% of its former size, with its collision radius scaled to match. The camera sits a little further back, so the ship appears about half its former size on screen.
-- **Retuned for the scale:** speed (30 → 56), wall spacing, gap sizes, fog, light ranges, and particle sizes.
+- **Retuned for the scale:** speed (30 → 56, later raised to 55 → 104; see Controls), wall spacing, gap sizes, fog, light ranges, and particle sizes.
 
 ## Camera
 
@@ -183,7 +181,7 @@ The camera is about 6 units behind the ship, so a wall the ship has just passed 
    - It's plain dark, with no UI colour.
    - **It's clipped by the gap, like a real shadow.** A shader discards the shadow wherever the wall has a hole, using the same gap shape as the collision test. So the shadow is on the wall while the ship is lined up with solid wall and gone while it's lined up with the gap. **When the ship overlaps the rim, the shadow is cut by the hole's edge**, so near-misses read without any UI.
    - **When it appears is a setting:** a slider under "Shadow on wall" in the Aids panel sets the distance from the wall at which the shadow starts to appear (4 to 60 units, default 20, saved per browser). It reaches full strength at half that distance. It's measured as distance, not time, so the shadow always appears at the same closeness to the wall whatever the speed.
-     - Why: the designer found the shadow appeared far too early. Originally it shared the other cues' 2-second fade-in, which at starting speed meant about 60 units out, long before the wall felt close. The default of 20 units is about 0.65 s at starting speed.
+     - Why: the designer found the shadow appeared far too early. Originally it shared the other cues' 2-second fade-in, which at starting speed meant about 60 units out, long before the wall felt close. The default of 20 units is about 0.35 s at the starting speed of 55.
      - It uses the straight-line distance down the tunnel to the wall, not the predicted path.
    - **Fuzzy to sharp:** like a real penumbra, the shadow's softness depends on how far the ship is from the wall. Far away it's a wide, faint smudge; it tightens into a crisp, dark ship silhouette at the moment of contact. The designer asked for this so the shadow fades in naturally rather than as a fixed decal.
      - The softness comes from the signed distance to the ship's rear silhouette (a 7-point polygon) computed in the fragment shader. One parameter, the blur width, takes it from smudge to outline: `shadowMinSoft` + distance × `shadowSoftness`.
