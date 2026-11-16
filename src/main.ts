@@ -424,13 +424,24 @@ function updateFreeCamera(dt: number, realDt: number): void {
   const rolling = input.scheme === 'rollpitch' && state === 'playing';
   const up = rolling ? ship.up : WORLD_UP;
   tmpA.copy(p).addScaledVector(ship.direction, -C.distance).addScaledVector(up, C.height);
-  tmpB.copy(p).addScaledVector(ship.direction, C.lookAhead * 0.5);
   easeCamUp(up, dt);
   camPos.lerp(tmpA, 1 - Math.exp(-9 * dt));
-  camLook.lerp(tmpB, 1 - Math.exp(-12 * dt));
+  aimThroughShip();
   camera.position.copy(camPos);
   applyShake(realDt);
   camera.lookAt(camLook);
+}
+
+/**
+ * Keep the ship at the centre of the screen: aim the camera along the line from the camera through
+ * the ship. Computed from the smoothed camera position every frame (not smoothed itself), so the ship
+ * never drifts off centre while the camera eases around.
+ */
+function aimThroughShip(): void {
+  const p = ship.position;
+  camLook.subVectors(p, camPos);
+  if (camLook.lengthSq() < 1e-6) camLook.copy(ship.direction);
+  camLook.normalize().multiplyScalar(CONFIG.camera.lookAhead).add(p);
 }
 
 function applyShake(realDt: number): void {
@@ -463,15 +474,10 @@ function updateCamera(dt: number, realDt: number): void {
   const R = CONFIG.tube.radius - 1.2;
   const rad = Math.hypot(tmpA.x, tmpA.y);
   if (rad > R) tmpA.multiplyScalar(R / rad).setZ(p.z + C.distance);
-  tmpB.set(
-    p.x * 0.92 + ship.direction.x * C.lookAhead * 0.35,
-    p.y * 0.92 + ship.direction.y * C.lookAhead * 0.35,
-    p.z - C.lookAhead,
-  );
 
   const k = state === 'dead' ? 1 - Math.exp(-2 * dt) : 1 - Math.exp(-9 * dt);
   camPos.lerp(tmpA, k);
-  camLook.lerp(tmpB, 1 - Math.exp(-12 * dt));
+  aimThroughShip();
   camera.position.copy(camPos);
   applyShake(realDt);
   if (input.scheme === 'rollpitch' && state !== 'title') {
@@ -620,6 +626,7 @@ requestAnimationFrame(frame);
   marker,
   cues,
   ship,
+  camera,
   input,
   obstacles,
   fps: () => frameTimes.length / frameTimes.reduce((a, b) => a + b, 0),

@@ -101,7 +101,8 @@ The user asked for a bigger world and a smaller ship ("like Stardew Valley"). We
 
 ## Camera
 
-- **Tunnel:** a chase camera that follows the ship sideways only partly (`follow` 0.85), pulled toward the tunnel axis so the way ahead stays readable. It's clamped inside the tunnel. It aims well ahead of the ship (`lookAhead`) and rolls slightly with the heading.
+- **The ship is always at the centre of the screen** (the designer's call). The camera aims along the line from itself through the ship, recomputed every frame from the camera's smoothed position, so the ship never drifts off centre while the camera eases around. In testing it stayed within 1 px of centre in both modes and both control schemes, even while weaving hard. Steering therefore shows as the world moving around a fixed ship, not the ship moving across the screen.
+- **Tunnel:** a chase camera that follows the ship sideways only partly (`follow` 0.85), pulled toward the tunnel axis, and clamped inside the tunnel. Because of the centring, this now shows up as a slightly angled view when the ship is near the wall, rather than the ship sitting off-centre. It rolls slightly with the heading (or with the ship, in roll + pitch).
 - **Field of view widens with speed** to sell the acceleration.
 - **Crash:** camera shake, slow motion (time scale 0.35, easing back), and chromatic aberration.
 - **Free flight:** a plain chase camera behind and above the ship's heading.
