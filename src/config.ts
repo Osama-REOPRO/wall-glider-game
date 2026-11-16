@@ -17,12 +17,14 @@ export const CONFIG = {
     radius: 0.26,
     /** Distance from the ship's centre to its engines. */
     tailOffset: 0.33,
-    startSpeed: 30,
-    maxSpeed: 56,
+    // Experiment: normal flight is what used to be full boost (1.85× the old 30 / 56 / 0.6).
+    startSpeed: 55,
+    maxSpeed: 104,
     /** Speed gained per ring passed. */
-    speedPerRing: 0.6,
+    speedPerRing: 1.1,
     /** Radians of heading change per screen-width of finger travel. */
-    steerSensitivity: 1.8,
+    // Experiment: 30% of the old 1.8, the steering you used to get while boosting.
+    steerSensitivity: 0.54,
     /** Max angle (radians) between the heading and the tube axis. */
     maxAngle: 0.55,
     /** How quickly the rendered heading follows the target heading (1/s). */
@@ -54,7 +56,7 @@ export const CONFIG = {
     poolSize: 7,
   },
   camera: {
-    fov: 70,
+    fov: 86, // experiment: the old 70 plus the old boost's 16° kick
     distance: 6.0,
     height: 1.7,
     /** 0 = camera stays on tube axis, 1 = camera fully follows ship laterally. */
@@ -65,11 +67,11 @@ export const CONFIG = {
   /** Control schemes (chosen in the Aids panel's Controls section). */
   controls: {
     /** Roll + pitch: radians of roll per screen-width of sideways finger travel. */
-    rollSensitivity: 3.2,
+    rollSensitivity: 0.96, // experiment: 30% of the old 3.2
     /** How much the tunnel camera rolls with the ship in roll + pitch (0 = level, 1 = fully). */
     cameraRollFollow: 1,
     /** Keyboard (desktop): holding a steering key turns at this many radians per second. */
-    keyboard: { steerRate: 1.1 },
+    keyboard: { steerRate: 0.33 }, // experiment: 30% of the old 1.1
   },
   /** Flight aids: cues that make depth readable from the chase camera. Each can be toggled in the Aids panel. */
   aids: {
@@ -101,9 +103,10 @@ export const CONFIG = {
     /** Points for a gap passed while boosting (a normal gap is 1). */
     gapPoints: 2,
     /** Speed multiplier at full boost. */
-    speedMultiplier: 1.85,
+    // Experiment: boost is now an extra tier on top of the faster normal flight.
+    speedMultiplier: 1.4,
     /** Steering sensitivity multiplier at full boost (lower = commit to your line before boosting). */
-    steerScale: 0.3,
+    steerScale: 0.6,
     /** Seconds to reach full boost, and to wind back down after it ends. */
     rampUp: 0.12,
     rampDown: 0.4,
@@ -114,7 +117,7 @@ export const CONFIG = {
     /** Free flight has no walls, so a boost there lasts this far. */
     freeFlightDistance: 100,
     /** Extra field of view (degrees) at full boost. */
-    fovKick: 16,
+    fovKick: 10,
     /** Double tap: each tap shorter than this (ms) and moving less than this (px)... */
     tapMaxMs: 250,
     tapMaxMove: 14,
@@ -143,7 +146,7 @@ export const CONFIG = {
   },
   /** Free-flight mode: open space, no tube, no obstacles. */
   space: {
-    speed: 30,
+    speed: 55,
     /** Pitch limit in free flight (radians). Yaw is unlimited. */
     maxPitch: 1.4,
     skyRadius: 850,

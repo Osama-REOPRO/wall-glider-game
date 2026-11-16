@@ -2,7 +2,8 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [main, 'claude/**']
+    # Experiment branches don't deploy, so they never replace the main game on GitHub Pages.
+    branches: [main, 'claude/**', '!claude/experiment-*']
   workflow_dispatch:
 
 permissions:

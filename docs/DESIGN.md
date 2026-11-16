@@ -2,6 +2,17 @@
 
 This file records the design decisions made so far: what we chose, why, and what we turned down. Any change that makes a design decision updates this file in the same commit. Tunable numbers live in `src/config.ts`; this file explains the reasoning behind them.
 
+## Experiment on this branch: boost feel as normal flight
+
+This branch (`claude/experiment-boost-feel`) tries the designer's idea: the way the ship flies while boosting becomes normal flight.
+- **Normal flight is the old full boost:** speed 55 rising to 104 (1.85× the old 30 to 56), steering at 30% of the old sensitivity in both control schemes and on the keyboard, and the old boost's wider view (field of view 86° instead of 70°).
+- **Boost is kept as an extra tier:** 1.4× the new speed, with steering cut to 60% of the new normal (about 18% of the original) and a further 10° of view. Double tap, boost pads and bonus gaps still trigger it.
+- **Only the feel changes:** the nitro flame, speed lines and strong colour fringe still appear only while boosting, so normal flight stays visually calm.
+- **Unchanged:** wall spacing and gap sizes, so every gap arrives sooner and has to be lined up earlier, which is exactly what made boosting feel good.
+- The branch doesn't deploy to GitHub Pages; it's shared as its own Artifact.
+
+The rest of this document describes the main game; values here override the ones below.
+
 ## Guiding principles
 
 ### Keep cues in the world, not in the UI
