@@ -11,6 +11,7 @@ import { Particles, Dust } from './particles';
 import { checkCollision } from './collision';
 import { Hud } from './hud';
 import { Space } from './space';
+import { SkyLevel } from './skylevel';
 import { WallShadow, TargetMarker, predict, hitRadius, type Prediction } from './aids';
 import { WorldCues } from './worldcues';
 import { SpeedLines } from './boost';
@@ -18,7 +19,8 @@ import { BoostPads } from './boostpads';
 
 type State = 'title' | 'playing' | 'dead';
 /** 'tunnel' is the game. 'free' is open space with no obstacles, for testing the controls. */
-type Mode = 'tunnel' | 'free';
+/** 'free' is open space; 'sky' is the sky-castle test level. Both are open flight with no collisions. */
+type Mode = 'tunnel' | 'free' | 'sky';
 
 const canvas = document.getElementById('game') as HTMLCanvasElement;
 
@@ -59,6 +61,9 @@ obstacles.onSpawn = (o, index, stretchStartZ) => pads.onWallSpawned(o, index, st
 const space = new Space();
 space.group.visible = false;
 scene.add(space.group);
+const sky = new SkyLevel();
+sky.group.visible = false;
+scene.add(sky.group);
 
 const input = new SteerInput(canvas);
 const hud = new Hud();
@@ -167,8 +172,17 @@ function setMode(m: Mode): void {
   obstacles.group.visible = tunnel;
   pads.group.visible = tunnel;
   dust.points.visible = tunnel;
-  space.group.visible = !tunnel;
-  scene.fog = tunnel ? tunnelFog : null;
+  space.group.visible = m === 'free';
+  sky.group.visible = m === 'sky';
+  scene.fog = tunnel ? tunnelFog : m === 'sky' ? sky.fog : null;
+  scene.background = m === 'sky' ? sky.fog.color : fogColor;
+  // The sky level is kilometres across; the tunnel needs fine depth precision up close.
+  camera.near = m === 'sky' ? 0.3 : 0.05;
+  camera.far = m === 'sky' ? 12000 : 900;
+  camera.updateProjectionMatrix();
+  // Daylight: only the sun and the brightest highlights should bloom.
+  if (m === 'sky') renderer.setBloom(0.3, 1.1);
+  else renderer.setBloom(0.6, 0.85);
   input.limits = tunnel ? 'cone' : 'free';
   ship.axisBank = tunnel;
 }
@@ -192,6 +206,20 @@ function startFreeFlight(): void {
   hud.showFreeFlight();
 }
 
+/** The sky-castle test level: open flight near a giant floating citadel above a sea of clouds. */
+function startSky(): void {
+  setMode('sky');
+  resetWorld();
+  ship.position.copy(sky.start);
+  ship.prevPosition.copy(sky.start);
+  camPos.copy(sky.start).add(tmpA.set(0, CONFIG.camera.height, CONFIG.camera.distance));
+  ship.speed = CONFIG.space.speed;
+  applyControls();
+  state = 'playing';
+  input.enabled = true;
+  hud.showFreeFlight();
+}
+
 function toMenu(): void {
   setMode('tunnel');
   resetWorld();
@@ -202,6 +230,7 @@ function toMenu(): void {
 
 hud.onTunnel = startGame;
 hud.onFree = startFreeFlight;
+hud.onSky = startSky;
 hud.onExit = toMenu;
 input.onEscape = () => {
   if (state !== 'title') toMenu();
@@ -292,7 +321,7 @@ input.onDoubleTap = tryBoost;
 hud.onControlsChange = applyControls;
 
 input.onPress = () => {
-  if (mode === 'free') return;
+  if (mode !== 'tunnel') return;
   if (state === 'title') startGame();
   else if (state === 'dead' && deadTime > 0.9) startGame();
 };
@@ -476,7 +505,7 @@ function updateReadout(dt: number): void {
 }
 
 function updateCamera(dt: number, realDt: number): void {
-  if (mode === 'free') {
+  if (mode !== 'tunnel') {
     updateFreeCamera(dt, realDt);
     return;
   }
@@ -549,7 +578,7 @@ function frame(now: number): void {
   input.update(dt);
 
   if (state === 'playing') runTime += dt;
-  if (mode === 'free') {
+  if (mode !== 'tunnel') {
     baseSpeed = CONFIG.space.speed;
     updateBoost(dt);
     fly(dt); // no collisions in free flight
@@ -588,7 +617,7 @@ function frame(now: number): void {
     }
   }
 
-  if (state === 'dead' || mode === 'free') clearAids();
+  if (state === 'dead' || mode !== 'tunnel') clearAids();
   else cues.update({ dt, ship, obstacles, prediction, camera, aids: hud.aids });
   if (state !== 'dead') emitTrail(dt);
 
@@ -608,17 +637,22 @@ function frame(now: number): void {
   if (mode === 'free') {
     ship.dimForWall(null);
     space.update(dt, camera, ship.position);
+  } else if (mode === 'sky') {
+    ship.dimForWall(null);
+    sky.update(dt, camera);
   }
   renderer.setAberration(state === 'dead' ? shake * 0.08 : 0.004 + (baseSpeed - CONFIG.ship.startSpeed) * 0.0006 + ship.boost * 0.03);
   renderer.render();
   requestAnimationFrame(frame);
 }
 
-// A link ending in #free opens straight into free flight.
+// A link ending in #free opens straight into free flight, #sky into the sky-castle level.
 if (location.hash === '#free') startFreeFlight();
+else if (location.hash === '#sky') startSky();
 else toMenu();
 window.addEventListener('hashchange', () => {
   if (location.hash === '#free' && mode !== 'free') startFreeFlight();
+  if (location.hash === '#sky' && mode !== 'sky') startSky();
 });
 requestAnimationFrame(frame);
 
@@ -667,5 +701,6 @@ requestAnimationFrame(frame);
     paused = on;
   },
   startFree: startFreeFlight,
+  startSky,
   menu: toMenu,
 };

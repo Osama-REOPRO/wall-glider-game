@@ -6,6 +6,8 @@ A 3D mobile prototype. A triangular ship flies on its own down an endless tube, 
 
 **Boost:** double-tap to fly much faster for one wall's spacing, with much less steering, so line up first. Shift or B on desktop. Every wall also has a small gold **bonus gap**: fly through it for 10 points (20 while boosting) and an automatic boost. Violet **boost pads** on the tunnel wall trigger the boost automatically when you fly close over them, or extend it if you're already boosting.
 
+**Sky castle** (the menu button, or a link ending in `#sky`) is a test level: open flight above a sea of clouds beside a vast floating citadel, half hidden in fog.
+
 **Free flight** (the menu button, or a link ending in `#free`) is an open-space sandbox for testing the controls. There's no tunnel and no obstacles, turning is unlimited (pitch stops short of straight up and down), and a readout shows heading, pitch and speed.
 
 **Flight aids** (the Aids button, top right) help you judge depth from behind the ship, and each can be switched on and off. In the world: the ship's shadow on the next wall (fuzzy far away, sharp at contact, clipped by the gap) and a rim that pulses red when you're about to hit, plus optional electric arcs, a headlight, a wall heat glow and bow-wave dust to compare. A forgiving hitbox is on by default. Interface target markers exist for comparison but are off by default, because cues should live in the world rather than in the UI.
@@ -50,5 +52,6 @@ On a desktop browser: hold the arrow keys or WASD to steer (or drag with the mou
 | `src/worldcues.ts` | Optional in-world cues: electric arcs to the nearest surface, headlight, wall heat glow, bow-wave dust. |
 | `src/boost.ts` | Speed-line streaks shown while boosting. (Boost timing, speed and steering live in `main.ts`; double-tap detection in `input.ts`.) |
 | `src/boostpads.ts` | Boost pads on the tunnel wall: placement, chevron shader, proximity trigger. |
+| `src/skylevel.ts` | Sky-castle test level: sky dome, sea of clouds, billboard cloud banks, the procedural citadel and islands, fog. |
 | `src/textures.ts` | Canvas-generated hull panels, normal maps (Sobel from height), emissive light strips, hazard stripes. |
 | `src/hud.ts` | Score, best score (localStorage), title and game-over overlay, mode buttons, Aids panel, HI/LO quality toggle. |

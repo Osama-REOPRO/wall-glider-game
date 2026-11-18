@@ -64,6 +64,12 @@ export class Renderer {
     window.addEventListener('resize', () => this.resize());
   }
 
+  /** Bloom strength and threshold (bright daylight scenes need a higher threshold). */
+  setBloom(strength: number, threshold: number): void {
+    this.bloom.strength = strength;
+    this.bloom.threshold = threshold;
+  }
+
   setQuality(q: Quality): void {
     this.quality = q;
     this.bloom.enabled = q === 'high';

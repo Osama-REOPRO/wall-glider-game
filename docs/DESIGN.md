@@ -216,7 +216,17 @@ The camera is about 6 units behind the ship, so a wall the ship has just passed 
   - No tunnel and no obstacles: a nebula sky shader, a starfield, and a distant gas giant and sun to steer by.
   - A dust cloud wraps around the ship on all three axes **in the vertex shader**, so it's endless at zero CPU cost and always shows your motion.
   - A heading/pitch/speed readout and a Menu button.
-- **Menu:** Tunnel and Free flight buttons. Tapping anywhere else starts the tunnel, and a link ending in `#free` opens free flight directly.
+- **Sky castle (test level):** an open level high in a planet's atmosphere, beside an enormous floating citadel, built to see what clouds, fog and a vast structure look like. Its own menu button, or a link ending in `#sky`. No collisions or objectives yet; flies like free flight. Code: `src/skylevel.ts`.
+  - **The citadel is an original design** in the spirit of a castle in the sky, about 1.4 km across and 1.5 km tall:
+    - **Structure:** a craggy inverted rock cone with hanging spikes, four terraced stone tiers with battlements, rim towers with teal conical roofs, gardens with trees and houses, a central keep of tall spires, and three waterfalls pouring off the lowest terrace into the clouds.
+    - **Surroundings:** five small satellite islands, each with a lone tower.
+  - **Scale through fog:** dense exponential fog in the horizon-haze colour (`0.0009`), so the far side and the tops of the spires dissolve and you only ever see part of it. The scale comes from what's hidden.
+  - **Clouds:**
+    - **Sea of clouds:** an animated noise shader far below, lit from the sun and fogged at the horizon.
+    - **Cloud banks:** about 1,000 soft billboard puffs in clusters, sorted back to front, with sunlit tops and cooler bellies. There's a thick collar around the underside hiding where the rock ends, a veil drifting across the upper towers, banks at all heights, and small clouds on the approach to fly through. Puffs fade as the camera reaches them, so they never pop.
+  - **Light:** a sky-dome shader (zenith blue to pale haze, with a sun disc), a warm directional sun and a sky/cloud bounce fill. Bloom is lowered and its threshold raised for daylight, so only the sun and highlights glow.
+  - The camera's far plane extends to 12 km in this level; the tunnel keeps a short range for depth precision.
+- **Menu:** Tunnel, Free flight and Sky castle buttons. Tapping anywhere else starts the tunnel, and a link ending in `#free` opens free flight directly.
 - **Attract mode:** on the title screen, an autopilot flies through the gaps, so the menu shows the game being played.
 
 ## Delivery and testing

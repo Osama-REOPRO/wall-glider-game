@@ -54,6 +54,7 @@ export class Hud {
   onControlsChange: (() => void) | null = null;
   onTunnel: (() => void) | null = null;
   onFree: (() => void) | null = null;
+  onSky: (() => void) | null = null;
   onExit: (() => void) | null = null;
 
   constructor() {
@@ -72,6 +73,7 @@ export class Hud {
     });
     button(document.getElementById('mode-tunnel')!, () => this.onTunnel?.());
     button(document.getElementById('mode-free')!, () => this.onFree?.());
+    button(document.getElementById('mode-sky')!, () => this.onSky?.());
     button(this.exitBtn, () => this.onExit?.());
 
     // Aids panel: the button opens/closes it; each checkbox toggles one aid.
