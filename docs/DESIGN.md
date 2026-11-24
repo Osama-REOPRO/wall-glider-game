@@ -39,7 +39,7 @@ The designer liked how the ship handled while boosting, so after an experiment o
 - **Steering** is 30% of the original sensitivity: `steerSensitivity` 0.54 (was 1.8), `rollSensitivity` 0.96 (was 3.2), keyboard 0.33 rad/s (was 1.1).
 - **View:** the field of view is 86° (was 70°).
 - **Effects stay calm:** the nitro flame, speed lines and strong colour fringe are still reserved for boosting.
-- **Unchanged:** wall spacing and gap sizes, so gaps arrive sooner and have to be lined up earlier. The game is about choosing your line early, not correcting late.
+- **Wall spacing was later doubled** (start 95 → 190, minimum 55 → 110, first wall at 220), because at the new speed walls came twice as often and the game had become too hard. Walls now arrive at roughly the original rate. Gap sizes are unchanged. The game is about choosing your line early, not correcting late.
 
 - **Drag sets the heading, and it holds when you lift your finger.** The brief said the only control is direction. Steering is relative: heading change = finger travel × `steerSensitivity` per screen width.
 - **Tunnel: the heading stays within a cone (0.55 rad) around the tunnel axis**, so the ship can never turn around and fly backwards.

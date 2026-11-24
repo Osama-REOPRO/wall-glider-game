@@ -31,10 +31,11 @@ export const CONFIG = {
     steerSmoothing: 14,
   },
   obstacles: {
-    firstAt: 130,
-    startSpacing: 95,
-    minSpacing: 55,
-    spacingPerRing: 1.2,
+    // Spacing doubled when normal speed went from 30 to 55, so walls arrive about as often as before.
+    firstAt: 220,
+    startSpacing: 190,
+    minSpacing: 110,
+    spacingPerRing: 2.4,
     startHole: 5.5,
     minHole: 2.4,
     holePerRing: 0.09,
