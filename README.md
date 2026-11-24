@@ -2,6 +2,8 @@
 
 A 3D mobile prototype. A triangular ship flies on its own down an endless tube, and you only control its heading: drag a finger to turn the nose and the ship flies that way. Fly through the gaps in the walls without touching anything.
 
+**Modes:** **Classic** (default, the original game) and **Fast** (normal flight at boost speed with heavy steering, in a wider tunnel; link `#fast`) on the menu, plus Free flight and Sky castle.
+
 **Controls:** two schemes, chosen at the top of the Aids panel. **Steer** (default): drag to aim the nose. **Roll + pitch**: slide sideways to roll, vertically to pitch, like a plane.
 
 **Boost:** double-tap to fly much faster for one wall's spacing, with much less steering, so line up first. Shift or B on desktop. Every wall also has a small gold **bonus gap**: fly through it for 10 points (20 while boosting) and an automatic boost. Violet **boost pads** on the tunnel wall trigger the boost automatically when you fly close over them, or extend it if you're already boosting.

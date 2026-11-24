@@ -12,17 +12,12 @@ export class Tube {
   readonly material: THREE.MeshStandardMaterial;
   private period: number;
 
-  constructor() {
-    const { radius, length, radialSegments, panelLength, panelsAround } = CONFIG.tube;
-    const geo = new THREE.CylinderGeometry(radius, radius, length, radialSegments, 1, true);
-    geo.rotateX(Math.PI / 2); // axis along Z
+  private maps: ReturnType<typeof createTubeMaps>;
 
+  constructor() {
     const maps = createTubeMaps();
-    // The texture holds 2×2 panels.
-    this.period = panelLength * 2;
-    const repeatU = panelsAround / 2;
-    const repeatV = length / this.period;
-    for (const t of Object.values(maps)) t.repeat.set(repeatU, repeatV);
+    this.maps = maps;
+    this.period = CONFIG.tube.panelLength * 2;
 
     this.material = new THREE.MeshStandardMaterial({
       map: maps.map,
@@ -36,8 +31,20 @@ export class Tube {
       emissiveIntensity: 1.1,
       side: THREE.BackSide,
     });
-    this.mesh = new THREE.Mesh(geo, this.material);
+    this.mesh = new THREE.Mesh(new THREE.BufferGeometry(), this.material);
     this.mesh.frustumCulled = false;
+    this.rebuild();
+  }
+
+  /** (Re)build the cylinder from CONFIG.tube, e.g. after a preset changed the radius. */
+  rebuild(): void {
+    const { radius, length, radialSegments, panelsAround } = CONFIG.tube;
+    const geo = new THREE.CylinderGeometry(radius, radius, length, radialSegments, 1, true);
+    geo.rotateX(Math.PI / 2); // axis along Z
+    this.mesh.geometry.dispose();
+    this.mesh.geometry = geo;
+    // The texture holds 2×2 panels.
+    for (const t of Object.values(this.maps)) t.repeat.set(panelsAround / 2, length / this.period);
   }
 
   /** Keep the tube around the ship: about 20 units behind it, the rest ahead. */

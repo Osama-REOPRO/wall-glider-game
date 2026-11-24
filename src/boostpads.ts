@@ -71,9 +71,7 @@ export class BoostPads {
 
   constructor(fogColor: THREE.Color, fogDensity: number) {
     const P = CONFIG.pads;
-    const R = CONFIG.tube.radius - 0.04;
-    const geo = new THREE.CylinderGeometry(R, R, P.length, 12, 1, true, -P.arc / 2, P.arc);
-    geo.rotateX(Math.PI / 2); // axis along z; v = 1 at the back end (+z)
+    const geo = BoostPads.geometry();
     for (let i = 0; i < P.pool; i++) {
       const uniforms = {
         uTime: { value: 0 },
@@ -93,6 +91,22 @@ export class BoostPads {
     }
     this.light = new THREE.PointLight(0xa060ff, 0, 30, 1.6);
     this.group.add(this.light);
+  }
+
+  private static geometry(): THREE.BufferGeometry {
+    const P = CONFIG.pads;
+    const R = CONFIG.tube.radius - 0.04;
+    const geo = new THREE.CylinderGeometry(R, R, P.length, 12, 1, true, -P.arc / 2, P.arc);
+    geo.rotateX(Math.PI / 2); // axis along z; v = 1 at the back end (+z)
+    return geo;
+  }
+
+  /** Rebuild the pad shape after a preset changed the tunnel radius. */
+  rebuild(): void {
+    const old = this.pads[0]?.mesh.geometry;
+    const geo = BoostPads.geometry();
+    for (const p of this.pads) p.mesh.geometry = geo;
+    old?.dispose();
   }
 
   clear(): void {

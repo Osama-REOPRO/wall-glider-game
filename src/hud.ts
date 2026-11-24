@@ -43,7 +43,15 @@ export class Hud {
   private sub = document.getElementById('overlay-sub')!;
   private cta = document.getElementById('overlay-cta')!;
   private qualityBtn = document.getElementById('quality') as HTMLButtonElement;
+  /** Best score is kept per game preset (classic keeps the original key, so old records carry over). */
+  private bestKey = BEST_KEY;
   best = Number(readStorage(BEST_KEY) ?? 0) || 0;
+
+  setBestFor(preset: 'classic' | 'fast'): void {
+    this.bestKey = preset === 'classic' ? BEST_KEY : `${BEST_KEY}.${preset}`;
+    this.best = Number(readStorage(this.bestKey) ?? 0) || 0;
+    this.renderBest();
+  }
 
   /** Current flight-aid toggles (saved per browser). */
   readonly aids: AidSettings = readAids();
@@ -53,6 +61,7 @@ export class Hud {
   onQualityChange: ((q: Quality) => void) | null = null;
   onControlsChange: (() => void) | null = null;
   onTunnel: (() => void) | null = null;
+  onFast: (() => void) | null = null;
   onFree: (() => void) | null = null;
   onSky: (() => void) | null = null;
   onExit: (() => void) | null = null;
@@ -72,6 +81,7 @@ export class Hud {
       this.onQualityChange?.(q);
     });
     button(document.getElementById('mode-tunnel')!, () => this.onTunnel?.());
+    button(document.getElementById('mode-fast')!, () => this.onFast?.());
     button(document.getElementById('mode-free')!, () => this.onFree?.());
     button(document.getElementById('mode-sky')!, () => this.onSky?.());
     button(this.exitBtn, () => this.onExit?.());
@@ -176,7 +186,7 @@ export class Hud {
     const isBest = score > this.best;
     if (isBest) {
       this.best = score;
-      writeStorage(BEST_KEY, String(score));
+      writeStorage(this.bestKey, String(score));
       this.renderBest();
     }
     this.title.textContent = isBest && score > 0 ? 'NEW BEST' : 'CRASHED';

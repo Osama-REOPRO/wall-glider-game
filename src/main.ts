@@ -12,6 +12,7 @@ import { checkCollision } from './collision';
 import { Hud } from './hud';
 import { Space } from './space';
 import { SkyLevel } from './skylevel';
+import { applyPreset, type Preset } from './presets';
 import { WallShadow, TargetMarker, predict, hitRadius, type Prediction } from './aids';
 import { WorldCues } from './worldcues';
 import { SpeedLines } from './boost';
@@ -187,7 +188,27 @@ function setMode(m: Mode): void {
   ship.axisBank = tunnel;
 }
 
-function startGame(): void {
+/** Which game preset is active: Classic (the original, default) or Fast. */
+let preset: Preset = 'classic';
+
+/** Switch presets: overwrite the config, and rebuild what was built from it (tunnel, pads, view). */
+function usePreset(p: Preset): void {
+  const radius = CONFIG.tube.radius;
+  preset = p;
+  applyPreset(p);
+  if (CONFIG.tube.radius !== radius) {
+    tube.rebuild();
+    pads.rebuild();
+  }
+  camera.fov = CONFIG.camera.fov;
+  camera.updateProjectionMatrix();
+  applyViewport();
+  hud.setBestFor(p);
+}
+
+/** Start a tunnel run; with no preset given, replays the current one (retry). */
+function startGame(p: Preset = preset): void {
+  usePreset(p);
   setMode('tunnel');
   resetWorld();
   applyControls();
@@ -197,6 +218,7 @@ function startGame(): void {
 }
 
 function startFreeFlight(): void {
+  usePreset('classic'); // open levels fly with Classic handling
   setMode('free');
   resetWorld();
   ship.speed = CONFIG.space.speed;
@@ -208,6 +230,7 @@ function startFreeFlight(): void {
 
 /** The sky-castle test level: open flight near a giant floating citadel above a sea of clouds. */
 function startSky(): void {
+  usePreset('classic');
   setMode('sky');
   resetWorld();
   ship.position.copy(sky.start);
@@ -221,6 +244,7 @@ function startSky(): void {
 }
 
 function toMenu(): void {
+  usePreset('classic'); // the title screen and a tap-to-start run are Classic
   setMode('tunnel');
   resetWorld();
   state = 'title';
@@ -228,7 +252,8 @@ function toMenu(): void {
   hud.showTitle();
 }
 
-hud.onTunnel = startGame;
+hud.onTunnel = () => startGame('classic');
+hud.onFast = () => startGame('fast');
 hud.onFree = startFreeFlight;
 hud.onSky = startSky;
 hud.onExit = toMenu;
@@ -649,9 +674,11 @@ function frame(now: number): void {
 // A link ending in #free opens straight into free flight, #sky into the sky-castle level.
 if (location.hash === '#free') startFreeFlight();
 else if (location.hash === '#sky') startSky();
+else if (location.hash === '#fast') startGame('fast');
 else toMenu();
 window.addEventListener('hashchange', () => {
   if (location.hash === '#free' && mode !== 'free') startFreeFlight();
+  if (location.hash === '#fast') startGame('fast');
   if (location.hash === '#sky' && mode !== 'sky') startSky();
 });
 requestAnimationFrame(frame);
@@ -691,7 +718,13 @@ requestAnimationFrame(frame);
   input,
   obstacles,
   fps: () => frameTimes.length / frameTimes.reduce((a, b) => a + b, 0),
-  start: startGame,
+  start: (p?: Preset) => startGame(p),
+  get tubeRadius() {
+    return CONFIG.tube.radius;
+  },
+  get preset() {
+    return preset;
+  },
   boost: tryBoost,
   pads,
   get boostState() {

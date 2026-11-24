@@ -32,9 +32,17 @@ A small triangular ship flies forward on its own down an endless tunnel. The pla
 
 ## Controls
 
-### Fast, heavy flight is the normal feel
+### Classic and Fast modes
 
-The designer liked how the ship handled while boosting, so after an experiment on a separate branch that feel became normal flight:
+The tunnel game has two modes on the menu, set up as presets (`src/presets.ts`) that overwrite the relevant config values when a run starts:
+- **Classic (the default):** the original game. Speed 30 to 56, full steering sensitivity (1.8; roll 3.2; keyboard 1.1 rad/s), a 70° view, a tunnel of radius 16, and walls 95 apart, tightening to 55. Boost is 1.85× speed with steering cut to 30%. Tapping the menu background starts Classic, and free flight and the sky castle fly with Classic handling.
+- **Fast:** the variant described below, in a tunnel of radius 32 with walls twice as far apart. Also reachable with a link ending in `#fast`.
+- Retry replays the same mode, and each mode keeps its own best score (Classic keeps the original record).
+- Why: the designer wanted the original version back as the default, keeping the fast version as its own mode.
+
+### The Fast mode: boost feel as normal flight
+
+The designer liked how the ship handled while boosting, so after an experiment on a separate branch that feel became normal flight in what is now the Fast mode:
 - **Speed** starts at 55 and rises to 104 (`ship.startSpeed`, `maxSpeed`). That's 1.85× the original 30 to 56.
 - **Steering** is 30% of the original sensitivity: `steerSensitivity` 0.54 (was 1.8), `rollSensitivity` 0.96 (was 3.2), keyboard 0.33 rad/s (was 1.1).
 - **View:** the field of view is 86° (was 70°).
